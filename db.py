@@ -12,7 +12,9 @@ load_dotenv()
 
 
 def _conn():
-    url = os.environ["DATABASE_URL"]
+    url = os.environ.get("DATABASE_URL") or os.environ.get("DATABASE_PUBLIC_URL")
+    if not url:
+        raise RuntimeError("Variável DATABASE_URL ou DATABASE_PUBLIC_URL não definida.")
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
     conn = psycopg2.connect(url)
@@ -20,12 +22,12 @@ def _conn():
     return conn
 
 
-def _row(cursor) -> dict | None:
+def _row(cursor):
     row = cursor.fetchone()
     return dict(row) if row else None
 
 
-def _rows(cursor) -> list[dict]:
+def _rows(cursor):
     return [dict(r) for r in cursor.fetchall()]
 
 
@@ -82,14 +84,14 @@ def init_db():
 
 # ── Clientes ──────────────────────────────────────────────────────────────────
 
-def listar_clientes() -> list[str]:
+def listar_clientes():
     with _conn() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM clientes ORDER BY id")
             return [r[0] for r in cur.fetchall()]
 
 
-def carregar_cliente(nome: str) -> dict | None:
+def carregar_cliente(nome: str):
     with _conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("SELECT * FROM clientes WHERE id = %s", (nome,))
@@ -170,14 +172,14 @@ def excluir_token(token: str):
         conn.commit()
 
 
-def get_tokens() -> list[dict]:
+def get_tokens():
     with _conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("SELECT * FROM tokens WHERE ativo = TRUE ORDER BY token")
             return _rows(cur)
 
 
-def get_info_token(token: str) -> dict | None:
+def get_info_token(token: str):
     with _conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
@@ -231,7 +233,7 @@ def criar_pedido(token: str, cliente_id: str, dados: dict):
         conn.commit()
 
 
-def get_pedidos(cliente_id: str = None) -> list[dict]:
+def get_pedidos(cliente_id: str = None):
     with _conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             if cliente_id:
@@ -244,7 +246,7 @@ def get_pedidos(cliente_id: str = None) -> list[dict]:
             return _rows(cur)
 
 
-def get_pedido(pedido_id: int) -> dict | None:
+def get_pedido(pedido_id: int):
     with _conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("SELECT * FROM pedidos WHERE id = %s", (pedido_id,))
