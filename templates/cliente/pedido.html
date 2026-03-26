@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}Solicitar Nota Fiscal{% endblock %}
+{% block subtitle %}Solicitação de NFS-e — {{ cliente_nome }}{% endblock %}
+
+{% block head %}
+<style>
+  /* Toggle Sim/Não */
+  .toggle-group { display: flex; gap: .5rem; }
+  .toggle-group input[type=radio] { display: none; }
+  .toggle-group label {
+    flex: 1; text-align: center; padding: .5rem 1rem;
+    border: 1.5px solid var(--border); border-radius: 8px;
+    cursor: pointer; font-weight: 600; font-size: .875rem;
+    color: var(--muted); transition: all .15s;
+  }
+  .toggle-group input[type=radio]:checked + label {
+    border-color: var(--primary); background: #eef2ff; color: var(--primary);
+  }
+
+  /* Campo alíquota oculto */
+  #aliquota-wrap { display: none; margin-top: .75rem; }
+  #aliquota-wrap.show { display: block; }
+
+  /* Checkbox inline alinhado */
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .9rem;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+  }
+  .checkbox-label input[type=checkbox] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-title">Solicitar Nota Fiscal de Serviço</div>
+
+  <form method="POST" autocomplete="off">
+
+    <!-- TOMADOR -->
+    <div class="section-label">Tomador do serviço</div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tipo de documento *</label>
+        <select name="tipo_doc_tomador" id="tipo_doc" required>
+          <option value="CPF">CPF</option>
+          <option value="CNPJ">CNPJ</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>CPF / CNPJ *</label>
+        <input type="text" name="inscricao_tomador" id="inscricao_tomador"
+               required placeholder="000.000.000-00">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input type="checkbox" name="sem_cep_tomador" id="sem_cep_tomador" value="1"
+               onchange="toggleCepTomador(this)">
+        Não informar endereço do tomador
+      </label>
+    </div>
+
+    <div id="bloco_cep_tomador">
+      <div class="form-row-3">
+        <div class="form-group">
+          <label>CEP do tomador *</label>
+          <input type="text" name="cep_tomador" id="cep_tomador" placeholder="00.000-000">
+        </div>
+        <div class="form-group">
+          <label>Número *</label>
+          <input type="text" name="numero_tomador" id="numero_tomador" placeholder="Ex: 123">
+        </div>
+        <div class="form-group">
+          <label>Complemento</label>
+          <input type="text" name="complemento_tomador" placeholder="Apto, Sala...">
+        </div>
+      </div>
+    </div>
+
+    <!-- SERVIÇO -->
+    <div class="section-label">Serviço</div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Competência *</label>
+        <input type="date" name="data_competencia" required>
+      </div>
+      <div class="form-group">
+        <label>Local de Prestação *</label>
+        <input type="text" name="local_prestacao" required
+               placeholder="Ex: Ouro Preto">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Descrição do serviço *</label>
+      <textarea name="descricao_servico" required
+                placeholder="Descreva o serviço prestado..."></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Valor (R$) *</label>
+        <input type="text" name="valor_servico" required
+               placeholder="0,00" id="valor_input">
+      </div>
+      <div></div>
+    </div>
+
+    <!-- CÓDIGOS -->
+    <div class="section-label">Códigos fiscais</div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Código de Tributação *</label>
+        {% if codigos_trib | length == 1 %}
+          <input type="text" value="{{ codigos_trib[0] }}" readonly>
+          <input type="hidden" name="codigo_tributacao" value="{{ codigos_trib[0] }}">
+        {% else %}
+          <select name="codigo_tributacao" required>
+            <option value="">Selecione...</option>
+            {% for c in codigos_trib %}
+              <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+        {% endif %}
+      </div>
+      <div class="form-group">
+        <label>Código NBS *</label>
+        {% if codigos_nbs | length == 1 %}
+          <input type="text" value="{{ codigos_nbs[0] }}" readonly>
+          <input type="hidden" name="codigo_nbs" value="{{ codigos_nbs[0] }}">
+        {% else %}
+          <select name="codigo_nbs" required>
+            <option value="">Selecione...</option>
+            {% for c in codigos_nbs %}
+              <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- OBRA -->
+    {% if tem_obra %}
+    <div class="section-label">Endereço da Obra</div>
+    <div class="form-row-3">
+      <div class="form-group">
+        <label>CEP da Obra *</label>
+        <input type="text" name="cep_obra" required placeholder="00.000-000">
+      </div>
+      <div class="form-group">
+        <label>Número *</label>
+        <input type="text" name="numero_obra" required placeholder="Ex: 10">
+      </div>
+      <div class="form-group">
+        <label>Complemento</label>
+        <input type="text" name="complemento_obra" placeholder="Opcional">
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- RETENÇÃO -->
+    <div class="section-label">Retenção de ISSQN</div>
+
+    <div class="form-group">
+      <label>Há retenção de ISSQN?</label>
+      <div class="toggle-group">
+        <input type="radio" name="retencao_issqn" id="issqn_nao" value="0" checked>
+        <label for="issqn_nao">Não</label>
+        <input type="radio" name="retencao_issqn" id="issqn_sim" value="1">
+        <label for="issqn_sim">Sim</label>
+      </div>
+
+      <div id="aliquota-wrap" class="form-group">
+        <label>Alíquota ISSQN (%)</label>
+        <input type="text" name="aliquota_issqn" id="aliquota_issqn"
+               placeholder="Ex: 5">
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; margin-top:1.5rem;">
+      <button type="submit" class="btn btn-primary">Enviar solicitação →</button>
+    </div>
+
+  </form>
+</div>
+
+<script>
+  /* Toggle endereço do tomador */
+  function toggleCepTomador(chk) {
+    const bloco = document.getElementById('bloco_cep_tomador');
+    bloco.style.display = chk.checked ? 'none' : 'block';
+    document.getElementById('cep_tomador').required    = !chk.checked;
+    document.getElementById('numero_tomador').required = !chk.checked;
+  }
+
+  /* Mostrar/ocultar campo alíquota */
+  document.querySelectorAll('input[name="retencao_issqn"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const wrap = document.getElementById('aliquota-wrap');
+      wrap.classList.toggle('show', r.value === '1' && r.checked);
+    });
+  });
+
+  /* Máscara automática CPF/CNPJ */
+  const tipoDoc    = document.getElementById('tipo_doc');
+  const inscricao  = document.getElementById('inscricao_tomador');
+
+  function maskInscricao(v, tipo) {
+    v = v.replace(/\D/g, '');
+    if (tipo === 'CPF') {
+      v = v.slice(0, 11);
+      v = v.replace(/(\d{3})(\d)/, '$1.$2');
+      v = v.replace(/(\d{3})(\d)/, '$1.$2');
+      v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    } else {
+      v = v.slice(0, 14);
+      v = v.replace(/(\d{2})(\d)/, '$1.$2');
+      v = v.replace(/(\d{3})(\d)/, '$1.$2');
+      v = v.replace(/(\d{3})(\d)/, '$1/$2');
+      v = v.replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+    }
+    return v;
+  }
+
+  inscricao.addEventListener('input', () => {
+    inscricao.value = maskInscricao(inscricao.value, tipoDoc.value);
+  });
+  tipoDoc.addEventListener('change', () => {
+    inscricao.value = '';
+    inscricao.placeholder = tipoDoc.value === 'CPF' ? '000.000.000-00' : '00.000.000/0000-00';
+  });
+
+  /* Máscara valor */
+  const valorInput = document.getElementById('valor_input');
+  valorInput.addEventListener('input', () => {
+    let v = valorInput.value.replace(/\D/g, '');
+    v = (parseInt(v || '0') / 100).toFixed(2);
+    v = v.replace('.', ',');
+    v = v.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    valorInput.value = v;
+  });
+</script>
+{% endblock %}

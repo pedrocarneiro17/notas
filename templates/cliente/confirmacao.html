@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Solicitação enviada!{% endblock %}
+{% block subtitle %}Confirmação{% endblock %}
+
+{% block content %}
+<div class="card" style="text-align:center; padding:3rem 1.5rem;">
+  <div style="font-size:3.5rem; margin-bottom:1rem;">✅</div>
+  <h2 style="font-size:1.4rem; margin-bottom:.75rem;">Solicitação enviada com sucesso!</h2>
+  <p style="color:var(--muted); max-width:420px; margin:0 auto; line-height:1.6;">
+    Sua solicitação de Nota Fiscal de Serviço foi recebida.<br>
+    Ela será analisada e você receberá o retorno em breve.
+  </p>
+  <a href="/pedido/{{ token }}" class="btn btn-primary"
+     style="margin-top:1.5rem; display:inline-flex;">
+    ← Solicitar outra nota
+  </a>
+</div>
+{% endblock %}

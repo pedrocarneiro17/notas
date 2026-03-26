@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% block title %}Admin — EmissorNFSe{% endblock %}
+{% block subtitle %}Painel de Controle{% endblock %}
+
+{% block head %}
+<style>
+  /* Tabs */
+  .tabs { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
+  .tab {
+    padding: .5rem 1.2rem; border-radius: 8px; cursor: pointer;
+    font-size: .875rem; font-weight: 600;
+    border: 1.5px solid var(--border); background: #fff; color: var(--muted);
+    transition: all .15s;
+  }
+  .tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* Filtro */
+  .filtro-bar {
+    display: flex; gap: .75rem; align-items: center;
+    margin-bottom: 1rem;
+  }
+  .filtro-bar select, .filtro-bar input {
+    padding: .45rem .75rem; border: 1.5px solid var(--border);
+    border-radius: 8px; font-size: .875rem; background: #fff;
+  }
+  .filtro-bar select:focus, .filtro-bar input:focus {
+    outline: none; border-color: var(--primary);
+  }
+
+  /* Contadores */
+  .counts { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+  .count-card {
+    flex: 1; background: #fff; border-radius: 10px;
+    padding: 1rem 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    border-left: 4px solid var(--border);
+  }
+  .count-card.pendente { border-color: var(--warning); }
+  .count-card.emitido  { border-color: var(--success); }
+  .count-card.erro     { border-color: var(--danger);  }
+  .count-card .num { font-size: 1.75rem; font-weight: 700; }
+  .count-card .lbl { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+
+  /* Token badge */
+  .token-badge {
+    font-family: monospace; letter-spacing: .08em;
+    background: #f3f4f6; padding: .2rem .55rem;
+    border-radius: 6px; font-size: .85rem;
+  }
+  .btn-copy {
+    background: none; border: none; cursor: pointer;
+    font-size: .8rem; color: var(--primary); font-weight: 600;
+    padding: .2rem .4rem; border-radius: 4px;
+  }
+  .btn-copy:hover { background: #eef2ff; }
+
+  .obs-erro { font-size: .75rem; color: var(--danger); max-width: 220px; display: block; margin-top: .25rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Contadores -->
+<div class="counts" id="counts">
+  <div class="count-card pendente">
+    <div class="num" id="cnt-pendente">—</div>
+    <div class="lbl">Pendentes</div>
+  </div>
+  <div class="count-card emitido">
+    <div class="num" id="cnt-emitido">—</div>
+    <div class="lbl">Emitidos</div>
+  </div>
+  <div class="count-card erro">
+    <div class="num" id="cnt-erro">—</div>
+    <div class="lbl">Com erro</div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab active" onclick="showTab('pedidos', this)">Notas</button>
+  <button class="tab"        onclick="showTab('tokens',  this)">Clientes &amp; Tokens</button>
+</div>
+
+<!-- ── Notas ───────────────────────────────────────────────── -->
+<div id="pane-pedidos" class="tab-pane active">
+  <div class="card">
+    <div class="card-title">Notas Fiscais</div>
+
+    <!-- Filtros -->
+    <div class="filtro-bar">
+      <select id="filtro-cliente" onchange="carregarPedidos()">
+        <option value="">Todos os clientes</option>
+        {% for nome in clientes %}
+          <option value="{{ nome }}">{{ nome }}</option>
+        {% endfor %}
+      </select>
+      <select id="filtro-status" onchange="carregarPedidos()">
+        <option value="">Todos os status</option>
+        <option value="pendente">Pendente</option>
+        <option value="emitindo">Emitindo</option>
+        <option value="emitido">Emitido</option>
+        <option value="erro">Erro</option>
+      </select>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Cliente</th>
+          <th>Tomador</th>
+          <th>Valor</th>
+          <th>Competência</th>
+          <th>Status</th>
+          <th>Obs</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody-pedidos">
+        <tr><td colspan="8" class="empty">Carregando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Clientes & Tokens ───────────────────────────────────── -->
+<div id="pane-tokens" class="tab-pane">
+
+  <div class="card">
+    <div class="card-title">Gerar token para cliente</div>
+    <form method="POST" action="/admin/gerar-token"
+          style="display:flex; gap:.75rem; align-items:flex-end;">
+      <div class="form-group" style="flex:1; margin:0;">
+        <label>Cliente</label>
+        <select name="cliente_id" required>
+          <option value="">Selecione...</option>
+          {% for nome in clientes %}
+            <option value="{{ nome }}">{{ nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">Gerar Token</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Tokens ativos</div>
+    {% if tokens %}
+    <table>
+      <thead>
+        <tr>
+          <th>Token</th>
+          <th>Cliente</th>
+          <th>Link</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tokens %}
+        <tr>
+          <td><span class="token-badge">{{ t.token }}</span></td>
+          <td>{{ t.cliente_id }}</td>
+          <td>
+            <button class="btn-copy" onclick="copiarLink('{{ t.token }}', this)">
+              📋 Copiar link
+            </button>
+          </td>
+          <td>
+            <form method="POST" action="/admin/excluir-token/{{ t.token }}"
+                  style="display:inline"
+                  onsubmit="return confirm('Excluir este token?')">
+              <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div class="empty">Nenhum token gerado ainda.</div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+/* ── Tabs ── */
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('pane-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+/* ── Carregar pedidos via API ── */
+async function carregarPedidos() {
+  const cliente = document.getElementById('filtro-cliente').value;
+  const status  = document.getElementById('filtro-status').value;
+
+  let url = '/admin/pedidos';
+  if (cliente) url += '?cliente_id=' + encodeURIComponent(cliente);
+
+  const res     = await fetch(url);
+  const pedidos = await res.json();
+
+  // Filtro de status no front
+  const filtrados = status ? pedidos.filter(p => p.status === status) : pedidos;
+
+  // Contadores (sempre do total sem filtro de status)
+  document.getElementById('cnt-pendente').textContent =
+    pedidos.filter(p => p.status === 'pendente').length;
+  document.getElementById('cnt-emitido').textContent =
+    pedidos.filter(p => p.status === 'emitido').length;
+  document.getElementById('cnt-erro').textContent =
+    pedidos.filter(p => p.status === 'erro').length;
+
+  const tbody = document.getElementById('tbody-pedidos');
+  if (!filtrados.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">Nenhuma nota encontrada.</td></tr>';
+    return;
+  }
+
+  const BADGE = {
+    pendente:  'badge-pendente',
+    emitindo:  'badge-emitindo',
+    emitido:   'badge-emitido',
+    erro:      'badge-erro',
+  };
+
+  tbody.innerHTML = filtrados.map(p => `
+    <tr id="row-${p.id}">
+      <td style="color:var(--muted);font-size:.8rem">${p.id}</td>
+      <td>${p.cliente_id}</td>
+      <td style="font-size:.85rem">${p.inscricao_tomador}</td>
+      <td>R$ ${p.valor_servico}</td>
+      <td>${p.data_competencia}</td>
+      <td><span class="badge ${BADGE[p.status] || ''}">${p.status}</span></td>
+      <td><span class="obs-erro">${p.observacao || ''}</span></td>
+      <td>
+        <button class="btn btn-danger btn-sm"
+                onclick="excluirPedido(${p.id}, this)">Excluir</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function excluirPedido(id, btn) {
+  if (!confirm('Excluir esta nota?')) return;
+  btn.disabled = true;
+  await fetch('/admin/excluir-pedido/' + id, { method: 'POST' });
+  document.getElementById('row-' + id).remove();
+  carregarPedidos(); // atualiza contadores
+}
+
+/* ── Copiar link ── */
+function copiarLink(token, btn) {
+  const link = 'http://localhost:5000/pedido/' + token;
+  const ta = document.createElement('textarea');
+  ta.value = link;
+  ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, 99999);
+  const ok = document.execCommand('copy');
+  document.body.removeChild(ta);
+  if (ok) {
+    btn.textContent = '✓ Copiado!';
+    setTimeout(() => btn.textContent = '📋 Copiar link', 2000);
+  } else {
+    prompt('Copie o link abaixo:', link);
+  }
+}
+
+// Carrega ao abrir
+carregarPedidos();
+// Auto-refresh a cada 10s
+setInterval(carregarPedidos, 10000);
+</script>
+{% endblock %}
