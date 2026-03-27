@@ -1,2 +1,1 @@
 pyinstaller --onedir --windowed --name "EmissorNFSe" --add-data "templates;templates" interface.py
->> 
