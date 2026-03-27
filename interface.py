@@ -77,21 +77,26 @@ def criar_titulo_secao(frame, texto, linha):
 # ── Lógica de emissão ────────────────────────────────────────────────────────
 
 def executar_emissao(dados, btn_emitir, lbl_status):
+    def _ui(fn):
+        btn_emitir.after(0, fn)
+
     def tarefa():
-        btn_emitir.config(state="disabled", text="Emitindo...")
-        lbl_status.config(text="⏳ Emissão em andamento...", fg="#e67e22")
+        _ui(lambda: btn_emitir.config(state="disabled", text="Emitindo..."))
+        _ui(lambda: lbl_status.config(text="⏳ Emissão em andamento...", fg="#e67e22"))
         try:
             emitir_nfse(dados)
-            lbl_status.config(text="✅ NFS-e emitida com sucesso!", fg="#27ae60")
+            _ui(lambda: lbl_status.config(text="✅ NFS-e emitida com sucesso!", fg="#27ae60"))
         except Exception as e:
             msg = str(e).lower()
-            if any(x in msg for x in ("target page", "browser has been closed", "target closed", "connection closed", "page closed", "has been closed", "navigation", "crashed")):
-                lbl_status.config(text="⚠️ Emissão cancelada.", fg="#7f8c8d")
+            if any(x in msg for x in ("target page", "browser has been closed", "target closed",
+                                      "connection closed", "page closed", "has been closed",
+                                      "navigation", "crashed")):
+                _ui(lambda: lbl_status.config(text="⚠️ Emissão cancelada.", fg="#7f8c8d"))
             else:
-                lbl_status.config(text=f"❌ Erro: {e}", fg="#e74c3c")
-                messagebox.showerror("Erro na emissão", str(e))
+                _ui(lambda: lbl_status.config(text=f"❌ Erro: {e}", fg="#e74c3c"))
+                _ui(lambda: messagebox.showerror("Erro na emissão", str(e)))
         finally:
-            btn_emitir.config(state="normal", text="▶  Emitir NFS-e")
+            _ui(lambda: btn_emitir.config(state="normal", text="▶  Emitir NFS-e"))
 
     threading.Thread(target=tarefa, daemon=True).start()
 
