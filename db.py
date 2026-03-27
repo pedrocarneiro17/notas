@@ -3,12 +3,19 @@ Camada de banco de dados unificada — PostgreSQL (Railway).
 Substitui clientes.py (JSON) e webapp_db.py (SQLite).
 """
 import os
+import sys
 import json
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
 
-load_dotenv()
+# Carrega .env ao lado do .exe (PyInstaller) ou do script
+if getattr(sys, "frozen", False):
+    _base = os.path.dirname(sys.executable)
+else:
+    _base = os.path.dirname(os.path.abspath(__file__))
+
+load_dotenv(os.path.join(_base, ".env"))
 
 
 def _conn():
