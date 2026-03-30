@@ -96,7 +96,7 @@
     <div class="form-row">
       <div class="form-group">
         <label>Competência *</label>
-        <input type="date" name="data_competencia" required>
+        <input type="date" name="data_competencia" id="data_competencia" required>
       </div>
       <div class="form-group">
         <label>Local de Prestação *</label>
@@ -244,6 +244,31 @@
     inscricao.value = '';
     inscricao.placeholder = tipoDoc.value === 'CPF' ? '000.000.000-00' : '00.000.000/0000-00';
   });
+
+  /* Limite de datas: até o dia 5 aceita mês anterior; depois só mês atual */
+  (function() {
+    const hoje = new Date();
+    const dia  = hoje.getDate();
+    const ano  = hoje.getFullYear();
+    const mes  = hoje.getMonth(); // 0-based
+
+    // Max: último dia do mês atual
+    const ultimoDia = new Date(ano, mes + 1, 0);
+    const maxStr = ultimoDia.toISOString().split('T')[0];
+
+    // Min: se dia <= 5, primeiro dia do mês anterior; senão, primeiro dia do mês atual
+    let minDate;
+    if (dia <= 5) {
+      minDate = new Date(ano, mes - 1, 1);
+    } else {
+      minDate = new Date(ano, mes, 1);
+    }
+    const minStr = minDate.toISOString().split('T')[0];
+
+    const campo = document.getElementById('data_competencia');
+    campo.min = minStr;
+    campo.max = maxStr;
+  })();
 
   /* Máscara valor */
   const valorInput = document.getElementById('valor_input');

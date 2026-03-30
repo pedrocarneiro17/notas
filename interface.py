@@ -848,7 +848,8 @@ def main():
     root = tk.Tk()
     root.title("Emissor NFS-e — Portal Nacional")
     root.configure(bg="#f5f6fa")
-    root.resizable(False, False)
+    root.resizable(True, True)
+    root.minsize(700, 520)
 
     cab = tk.Frame(root, bg="#2c3e50", pady=14)
     cab.pack(fill="x")

@@ -125,9 +125,12 @@ def emitir_nfse(dados: dict):
     complemento_obra    = dados.get("complemento_obra", "")
 
     with sync_playwright() as p:
-        navegador = p.chromium.launch(headless=False)
+        perfil = os.path.join(_pasta_base(), "browser_profile")
+        os.makedirs(perfil, exist_ok=True)
 
-        contexto = navegador.new_context(
+        contexto = p.chromium.launch_persistent_context(
+            user_data_dir=perfil,
+            headless=False,
             ignore_https_errors=True,
             accept_downloads=True,
             client_certificates=[{
@@ -158,14 +161,15 @@ def emitir_nfse(dados: dict):
         pagina.locator("#DataCompetencia").press("Enter")
         pagina.locator("body").click()
 
-        # ── [4] Regime tributário ────────────────────────────────────
-        print("[5] Regime tributário: Simples Nacional")
-        pagina.locator("#SimplesNacional_RegimeApuracaoTributosSN_chosen a").filter(
-            has_text="Selecione..."
-        ).click()
-        pagina.locator("#SimplesNacional_RegimeApuracaoTributosSN_chosen").get_by_text(
-            "Regime de apuração dos tributos federais e municipal pelo Simples Nacional"
-        ).click()
+        # ── [4] Regime tributário (apenas Simples Nacional) ──────────
+        if not lucro_presumido:
+            print("[5] Regime tributário: Simples Nacional")
+            pagina.locator("#SimplesNacional_RegimeApuracaoTributosSN_chosen a").filter(
+                has_text="Selecione..."
+            ).click()
+            pagina.locator("#SimplesNacional_RegimeApuracaoTributosSN_chosen").get_by_text(
+                "Regime de apuração dos tributos federais e municipal pelo Simples Nacional"
+            ).click()
 
         # ── [5] Dados do emitente (CEP) ──────────────────────────────
         print(f"[6] Preenchendo CEP: {cep}")
@@ -185,8 +189,11 @@ def emitir_nfse(dados: dict):
             print(f"[6c] Preenchendo endereço do tomador: CEP {cep_tomador}, nº {numero_tomador}")
             pagina.locator("#pnlTomadorInformarEnderecoCheck label").click()
             campo_cep = pagina.locator("#Tomador_EnderecoNacional_CEP")
+            campo_cep.click()
             for _ in range(8):
                 campo_cep.press("Delete")
+                time.sleep(0.05)
+            time.sleep(0.3)
             campo_cep.fill(cep_tomador)
             pagina.locator("#btn_Tomador_EnderecoNacional_CEP").click()
             pagina.wait_for_load_state("networkidle")
@@ -327,4 +334,4 @@ def emitir_nfse(dados: dict):
         #dl_pdf.value.save_as(os.path.join(_pasta_downloads(), dl_pdf.value.suggested_filename))
 
         #print("✅ NFS-e emitida e arquivos salvos em /downloads")
-        navegador.close()
+        contexto.close()
