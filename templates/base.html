@@ -92,6 +92,16 @@
     .form-row   { display: grid; grid-template-columns: 1fr 1fr;     gap: 1rem; }
     .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
 
+    @media (max-width: 600px) {
+      main { margin: 1rem auto; padding: 0 .75rem; }
+      .card { padding: 1rem; border-radius: 8px; }
+      .form-row,
+      .form-row-3 { grid-template-columns: 1fr; }
+      header { padding: .75rem 1rem; }
+      header h1 { font-size: 1rem; }
+      header .sub { display: none; }
+    }
+
     /* ── Buttons ── */
     .btn {
       display: inline-flex; align-items: center; gap: .35rem;
@@ -126,12 +136,14 @@
     .badge-erro      { background: #fee2e2; color: #991b1b; }
 
     /* ── Table ── */
-    table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; font-size: .875rem; min-width: 480px; }
     th {
       text-align: left; padding: .6rem 1rem;
       font-size: .75rem; font-weight: 700;
       color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
       border-bottom: 1.5px solid var(--border);
+      white-space: nowrap;
     }
     td { padding: .75rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
     tr:last-child td { border-bottom: none; }

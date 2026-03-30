@@ -189,13 +189,16 @@ def emitir_nfse(dados: dict):
 
         if not sem_cep_tomador:
             print(f"[6c] Preenchendo endereço do tomador: CEP {cep_tomador}, nº {numero_tomador}")
-            pagina.locator("#pnlTomadorInformarEnderecoCheck label").click()
+            digits = re.sub(r"\D", "", inscricao_tomador)
+            if len(digits) <= 11:  # CPF
+                pagina.locator("#pnlTomadorInformarEnderecoCheck label").click()
             campo_cep = pagina.locator("#Tomador_EnderecoNacional_CEP")
             campo_cep.click()
             pagina.locator("#Tomador_EnderecoNacional_CEP").fill("")
             campo_cep.fill(cep_tomador)
             pagina.locator("#btn_Tomador_EnderecoNacional_CEP").click()
             pagina.wait_for_load_state("networkidle")
+            time.sleep(2)
             pagina.locator("#Tomador_EnderecoNacional_Numero").fill("")
             pagina.locator("#Tomador_EnderecoNacional_Numero").fill(numero_tomador)
             if complemento_tomador:
