@@ -4,6 +4,8 @@ import time
 import os
 import sys
 
+from posthog import page
+
 os.environ["NODE_OPTIONS"] = "--openssl-legacy-provider"
 
 
@@ -188,17 +190,16 @@ def emitir_nfse(dados: dict):
         if not sem_cep_tomador:
             print(f"[6c] Preenchendo endereço do tomador: CEP {cep_tomador}, nº {numero_tomador}")
             pagina.locator("#pnlTomadorInformarEnderecoCheck label").click()
-            campo_cep = pagina.locator("#Tomador_EnderecoNacional_CEP")
-            campo_cep.click()
-            for _ in range(8):
-                campo_cep.press("Delete")
-                time.sleep(0.05)
-            time.sleep(0.3)
-            campo_cep.fill(cep_tomador)
+            pagina.locator("#Tomador_EnderecoNacional_CEP").click()
+            pagina.locator("#Tomador_EnderecoNacional_CEP").fill("")
+            time.sleep(0.5)
+            pagina.locator("#Tomador_EnderecoNacional_CEP").fill(cep_tomador)
             pagina.locator("#btn_Tomador_EnderecoNacional_CEP").click()
             pagina.wait_for_load_state("networkidle")
+            pagina.locator("#Tomador_EnderecoNacional_CEP").fill("")
             pagina.locator("#Tomador_EnderecoNacional_Numero").fill(numero_tomador)
             if complemento_tomador:
+                pagina.locator("#Tomador_EnderecoNacional_Complemento").fill("")
                 pagina.locator("#Tomador_EnderecoNacional_Complemento").fill(complemento_tomador)
         else:
             print("[6c] CEP do tomador ignorado (sem_cep_tomador=True)")
@@ -268,39 +269,50 @@ def emitir_nfse(dados: dict):
 
 
         # ── [11] Retenção de ISSQN ───────────────────────────────────
-        if retencao_issqn:
-            print(f"[12] Retenção ISSQN: Sim, alíquota {aliquota_issqn}%")
-            pagina.get_by_text("Sim").nth(3).click()
-            pagina.get_by_text("Retido pelo Tomador").click()
-            pagina.locator("#ISSQN_AliquotaInformada").fill(aliquota_issqn)
+        if lucro_presumido:
+            pagina.get_by_text("Não").nth(1).click()
 
-        if obra:
+        if retencao_issqn:
+            print(f"[12] Retenção ISSQN: Sim")
+            if lucro_presumido:
+                pagina.get_by_text("Sim").nth(2).click()
+            else:
+                pagina.get_by_text("Sim").nth(3).click()
+            pagina.get_by_text("Retido pelo Tomador").click()
+            if not lucro_presumido and aliquota_issqn:
+                pagina.locator("#ISSQN_AliquotaInformada").fill(aliquota_issqn)
+
+        if lucro_presumido:
+            pagina.get_by_text("Não").nth(2).click()
+            pagina.get_by_text("Não").nth(5).click()
+
+            
+        elif obra:
             pagina.get_by_text("Não").nth(5).click()
             pagina.get_by_text("Não", exact=True).nth(3).click()
 
         # ── [12] Tributação Federal (PIS/COFINS) ─────────────────────
         print("[13] Selecionando tributação federal...")
-        pagina.get_by_text("Não").nth(3).click()
+        if not lucro_presumido:
+            pagina.get_by_text("Não").nth(3).click()
 
         if lucro_presumido:
-            pagina.evaluate("""() => {
-                const sel = document.getElementById('TributacaoFederal_PISCofins_SituacaoTributaria');
-                const opt = Array.from(sel.options).find(o => o.text.includes('01 - Operação Tributável'));
-                if (opt) { sel.value = opt.value; $(sel).trigger('change').trigger('chosen:updated'); }
-            }""")
+            pagina.locator("#TributacaoFederal_PISCofins_SituacaoTributaria_chosen a").filter(has_text="Selecione...").click()
+            pagina.locator("#TributacaoFederal_PISCofins_SituacaoTributaria_chosen").get_by_text("01 - Operação Tributável com").click()
+            time.sleep(1)
+            pagina.locator("#TributacaoFederal_PISCofins_BaseDeCalculo").wait_for(state="visible", timeout=10000)
             pagina.locator("#TributacaoFederal_PISCofins_BaseDeCalculo").fill(valor_normalizado)
             pagina.locator("#TributacaoFederal_PISCofins_AliquotaPIS").fill("0,065")
             pagina.locator("#TributacaoFederal_PISCofins_AliquotaCOFINS").fill("0,300")
-            pagina.evaluate("""() => {
-                const sel = document.getElementById('TributacaoFederal_PISCofins_TipoRetencao');
-                const opt = Array.from(sel.options).find(o => o.text.includes('PIS/COFINS/CSLL Retidos'));
-                if (opt) { sel.value = opt.value; $(sel).trigger('change').trigger('chosen:updated'); }
-            }""")
+            pagina.locator("#TributacaoFederal_PISCofins_TipoRetencao_chosen a").filter(has_text="Selecione...").click()
+            pagina.locator("#TributacaoFederal_PISCofins_TipoRetencao_chosen").get_by_text("PIS/COFINS/CSLL Retidos").click()
+            
+            time.sleep(2)
             valor_float = _valor_para_float(valor_normalizado)
+            irrf = pagina.locator("#TributacaoFederal_ValorIRRF")
+            irrf.wait_for(state="visible", timeout=10000)
             pagina.locator("#TributacaoFederal_ValorIRRF").fill(_float_para_br(valor_float * 0.015))
-            pagina.locator("#TributacaoFederal_ValorCSLL").click()
-            pagina.locator("#TributacaoFederal_ValorCSLL").fill(
-                _float_para_br(valor_float * (0.0065 + 0.03 + 0.01))
+            pagina.locator("#TributacaoFederal_ValorCSLL").fill(_float_para_br(valor_float * (0.0065 + 0.03 + 0.01))
             )
         else:
             pagina.evaluate("""() => {

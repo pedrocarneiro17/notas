@@ -255,7 +255,7 @@ async function excluirPedido(id, btn) {
 
 /* ── Copiar link ── */
 function copiarLink(token, btn) {
-  const link = location.origin + '/pedido/' + token;
+  const link = 'https://contajur-notas.up.railway.app/pedido/' + token;
   const ta = document.createElement('textarea');
   ta.value = link;
   ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';

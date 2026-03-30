@@ -466,15 +466,14 @@ def construir_aba_pedidos(parent, root):
     import db as _db
 
     # ── Info do servidor ──────────────────────────────────────
-    ip = _ip_local()
-    url_admin = f"http://{ip}:5000/admin"
+    url_admin = "https://contajur-notas.up.railway.app/admin"
 
     frame_srv = tk.Frame(parent, bg="#2c3e50", pady=6)
     frame_srv.pack(fill="x")
 
     tk.Label(
         frame_srv,
-        text=f"🌐  Servidor ativo — Admin: {url_admin}  |  Clientes: http://{ip}:5000/pedido/<token>",
+        text=f"🌐  Servidor ativo — Admin: {url_admin}  |  Clientes: https://contajur-notas.up.railway.app/pedido/<token>",
         font=("Segoe UI", 8), bg="#2c3e50", fg="#bdc3c7"
     ).pack(side="left", padx=12)
 
