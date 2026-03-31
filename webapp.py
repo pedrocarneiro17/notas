@@ -44,7 +44,7 @@ def _disparar_webhook(pedido: dict):
     cliente = db.carregar_cliente(cliente_id)
     cnpj    = (cliente or {}).get("cnpj", "")
 
-    title = f"Emitir NFS-e — {cliente_id} ({competencia})"
+    title = f"Emitir NFS-e ({competencia})"
     description = (
         f"Solicitação recebida via portal.\n"
         f"Tomador: {tomador}\n"
