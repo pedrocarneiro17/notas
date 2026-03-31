@@ -382,7 +382,7 @@ def emitir_nfse(dados: dict):
         print("[14] Avançando para emissão final...")
         pagina.get_by_role("button", name="Avançar").click()
         pagina.wait_for_load_state("domcontentloaded")
-        time.sleep(500)  # aguarda possíveis popups ou carregamentos adicionais
+        time.sleep(5)  # aguarda possíveis popups ou carregamentos adicionais
 
         #pagina.locator("#btnProsseguir").click()
         #pagina.wait_for_load_state("domcontentloaded")

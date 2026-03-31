@@ -850,10 +850,33 @@ def construir_aba_pedidos(parent, root):
 
     atualizar_lista()
 
-    # Auto-refresh a cada 5 segundos
+    # Auto-refresh a cada 5 segundos (DB em background para não travar a UI)
     def _auto_refresh():
-        atualizar_lista()
-        root.after(5000, _auto_refresh)
+        def _buscar():
+            try:
+                pedidos = _db.get_pedidos()
+                root.after(0, lambda: _aplicar_pedidos(pedidos))
+            except Exception:
+                pass
+            root.after(5000, _auto_refresh)
+
+        def _aplicar_pedidos(pedidos):
+            tree.delete(*tree.get_children())
+            for p in pedidos:
+                status = p["status"]
+                tree.insert("", "end", values=(
+                    p["id"],
+                    p["cliente_id"],
+                    p["inscricao_tomador"],
+                    f"R$ {p['valor_servico']}",
+                    p["data_competencia"],
+                    status.upper(),
+                ), tags=(status,))
+            for s, cor in STATUS_COR.items():
+                tree.tag_configure(s, foreground=cor)
+
+        threading.Thread(target=_buscar, daemon=True).start()
+
     root.after(5000, _auto_refresh)
 
 
