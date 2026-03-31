@@ -4,9 +4,18 @@ import time
 import os
 import sys
 
-from posthog import page
-
 os.environ["NODE_OPTIONS"] = "--openssl-legacy-provider"
+
+_contexto_ativo = None
+
+def cancelar_emissao():
+    global _contexto_ativo
+    if _contexto_ativo:
+        try:
+            _contexto_ativo.close()
+        except Exception:
+            pass
+        _contexto_ativo = None
 
 
 def _pasta_base() -> str:
@@ -130,6 +139,7 @@ def emitir_nfse(dados: dict):
         perfil = os.path.join(_pasta_base(), "browser_profile")
         os.makedirs(perfil, exist_ok=True)
 
+        global _contexto_ativo
         contexto = p.chromium.launch_persistent_context(
             user_data_dir=perfil,
             headless=False,
@@ -141,7 +151,7 @@ def emitir_nfse(dados: dict):
                 "passphrase": senha_cert
             }]
         )
-
+        _contexto_ativo = contexto
         pagina = contexto.new_page()
 
         # ── [1] Login ───────────────────────────────────────────────
@@ -349,4 +359,4 @@ def emitir_nfse(dados: dict):
         #dl_pdf.value.save_as(os.path.join(_pasta_downloads(), dl_pdf.value.suggested_filename))
 
         #print("✅ NFS-e emitida e arquivos salvos em /downloads")
-        contexto.close()
+        _contexto_ativo = None

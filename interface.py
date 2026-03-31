@@ -6,7 +6,7 @@ import socket
 import re
 import webbrowser
 
-from fluxo_nfse import emitir_nfse
+from fluxo_nfse import emitir_nfse, cancelar_emissao
 from db import listar_clientes, carregar_cliente, salvar_cliente, deletar_cliente, init_db
 
 
@@ -76,12 +76,13 @@ def criar_titulo_secao(frame, texto, linha):
 
 # ── Lógica de emissão ────────────────────────────────────────────────────────
 
-def executar_emissao(dados, btn_emitir, lbl_status):
+def executar_emissao(dados, btn_emitir, btn_cancelar, lbl_status):
     def _ui(fn):
         btn_emitir.after(0, fn)
 
     def tarefa():
         _ui(lambda: btn_emitir.config(state="disabled", text="Emitindo..."))
+        _ui(lambda: btn_cancelar.config(state="normal"))
         _ui(lambda: lbl_status.config(text="⏳ Emissão em andamento...", fg="#e67e22"))
         try:
             emitir_nfse(dados)
@@ -97,6 +98,7 @@ def executar_emissao(dados, btn_emitir, lbl_status):
                 _ui(lambda: messagebox.showerror("Erro na emissão", str(e)))
         finally:
             _ui(lambda: btn_emitir.config(state="normal", text="▶  Emitir NFS-e"))
+            _ui(lambda: btn_cancelar.config(state="disabled"))
 
     threading.Thread(target=tarefa, daemon=True).start()
 
@@ -128,8 +130,18 @@ def coletar_dados(campos) -> dict:
     }
 
 
-def validar_e_emitir(campos, btn_emitir, lbl_status):
+def validar_e_emitir(campos, btn_emitir, btn_cancelar, lbl_status):
     dados = coletar_dados(campos)
+
+    # Re-lê dados do cliente do banco para garantir que estão atualizados
+    nome_cliente = campos["cliente"].get()
+    if nome_cliente:
+        cliente_atual = carregar_cliente(nome_cliente)
+        if cliente_atual:
+            dados["caminho_certificado"] = cliente_atual.get("caminho_certificado", "")
+            dados["senha_certificado"]   = cliente_atual.get("senha_certificado", "")
+            dados["cep"]                 = cliente_atual.get("cep", "")
+            dados["lucro_presumido"]     = cliente_atual.get("lucro_presumido", False)
 
     obrigatorios = {
         "Caminho do Certificado": dados["caminho_certificado"],
@@ -165,7 +177,7 @@ def validar_e_emitir(campos, btn_emitir, lbl_status):
             messagebox.showwarning("Campo obrigatório", "Informe o Número da Obra.")
             return
 
-    executar_emissao(dados, btn_emitir, lbl_status)
+    executar_emissao(dados, btn_emitir, btn_cancelar, lbl_status)
 
 
 def preencher_emitente(campos, dados: dict, toggle_obra_fn=None):
@@ -1171,15 +1183,30 @@ def main():
                           bg="#f5f6fa", fg="#7f8c8d")
     lbl_status.grid(row=22, column=0, columnspan=3, sticky="w", pady=(0, 6))
 
+    frm_btns = tk.Frame(frame, bg="#f5f6fa")
+    frm_btns.grid(row=23, column=0, columnspan=3, pady=(4, 8))
+
     btn_emitir = tk.Button(
-        frame, text="▶  Emitir NFS-e",
+        frm_btns, text="▶  Emitir NFS-e",
         font=("Segoe UI", 10, "bold"),
         bg="#27ae60", fg="white",
         activebackground="#219a52", activeforeground="white",
         relief="flat", padx=20, pady=8, cursor="hand2",
-        command=lambda: validar_e_emitir(campos, btn_emitir, lbl_status)
     )
-    btn_emitir.grid(row=23, column=0, columnspan=3, pady=(4, 8))
+    btn_emitir.pack(side="left", padx=(0, 8))
+
+    btn_cancelar = tk.Button(
+        frm_btns, text="⛔  Cancelar",
+        font=("Segoe UI", 10, "bold"),
+        bg="#e74c3c", fg="white",
+        activebackground="#c0392b", activeforeground="white",
+        relief="flat", padx=20, pady=8, cursor="hand2",
+        state="disabled",
+        command=cancelar_emissao,
+    )
+    btn_cancelar.pack(side="left")
+
+    btn_emitir.config(command=lambda: validar_e_emitir(campos, btn_emitir, btn_cancelar, lbl_status))
 
     root.mainloop()
 
