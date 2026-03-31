@@ -3,6 +3,7 @@ import re
 import time
 import os
 import sys
+import glob
 
 os.environ["NODE_OPTIONS"] = "--openssl-legacy-provider"
 
@@ -22,6 +23,40 @@ def _pasta_base() -> str:
     if getattr(sys, "frozen", False):
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
+
+
+def _achar_chromium() -> str:
+    """Localiza o executável do Chromium em qualquer lugar do PC."""
+    candidatos = []
+
+    # 1) Bundled pelo PyInstaller (_internal/...)
+    base = _pasta_base()
+    candidatos += glob.glob(os.path.join(
+        base, "_internal", "playwright", "driver", "package",
+        ".local-browsers", "chromium-*", "chrome-win*", "chrome.exe"
+    ))
+
+    # 2) ms-playwright padrão do Windows
+    local_app = os.environ.get("LOCALAPPDATA", "")
+    user_profile = os.environ.get("USERPROFILE", "")
+    for raiz in [local_app, user_profile]:
+        if raiz:
+            candidatos += glob.glob(os.path.join(
+                raiz, "ms-playwright", "chromium-*", "chrome-win*", "chrome.exe"
+            ))
+
+    # 3) Variável de ambiente PLAYWRIGHT_BROWSERS_PATH
+    pw_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
+    if pw_path:
+        candidatos += glob.glob(os.path.join(
+            pw_path, "chromium-*", "chrome-win*", "chrome.exe"
+        ))
+
+    # Retorna o primeiro encontrado (mais recente por nome, ordem decrescente)
+    candidatos = [c for c in candidatos if os.path.isfile(c)]
+    if candidatos:
+        return sorted(candidatos)[-1]
+    return ""  # Playwright usará o padrão interno
 
 
 def _pasta_downloads() -> str:
@@ -140,7 +175,8 @@ def emitir_nfse(dados: dict):
         os.makedirs(perfil, exist_ok=True)
 
         global _contexto_ativo
-        contexto = p.chromium.launch_persistent_context(
+        chrome_exe = _achar_chromium()
+        launch_kwargs = dict(
             user_data_dir=perfil,
             headless=False,
             ignore_https_errors=True,
@@ -151,6 +187,9 @@ def emitir_nfse(dados: dict):
                 "passphrase": senha_cert
             }]
         )
+        if chrome_exe:
+            launch_kwargs["executable_path"] = chrome_exe
+        contexto = p.chromium.launch_persistent_context(**launch_kwargs)
         _contexto_ativo = contexto
         pagina = contexto.new_page()
 
