@@ -134,9 +134,9 @@ def validar_e_emitir(campos, btn_emitir, btn_cancelar, lbl_status):
     dados = coletar_dados(campos)
 
     # Re-lê dados do cliente do banco para garantir que estão atualizados
-    nome_cliente = campos["cliente"].get()
-    if nome_cliente:
-        cliente_atual = carregar_cliente(nome_cliente)
+    nome_cliente = campos.get("nome_cliente_var")
+    if nome_cliente and nome_cliente.get():
+        cliente_atual = carregar_cliente(nome_cliente.get())
         if cliente_atual:
             dados["caminho_certificado"] = cliente_atual.get("caminho_certificado", "")
             dados["senha_certificado"]   = cliente_atual.get("senha_certificado", "")
@@ -893,6 +893,7 @@ def main():
              bg="#f5f6fa", anchor="w").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
 
     var_cliente = tk.StringVar()
+    campos["nome_cliente_var"] = var_cliente
     combo_clientes = ttk.Combobox(
         frame, textvariable=var_cliente,
         values=[""] + listar_clientes(),
