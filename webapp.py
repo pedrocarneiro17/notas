@@ -1,6 +1,10 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, Response
 import threading
 import uuid
+import os
+import requests as http_requests
+from functools import wraps
+from datetime import datetime, timedelta
 
 import db
 
@@ -9,6 +13,77 @@ app.secret_key = "nfse_webapp_2024"
 
 with app.app_context():
     db.init_db()
+
+WEBHOOK_URL      = os.environ.get("WEBHOOK_URL", "")
+API_KEY          = os.environ.get("API_KEY", "")
+TASK_ASSIGNED_TO = os.environ.get("TASK_ASSIGNED_TO", "")
+TASK_CREATED_BY  = os.environ.get("TASK_CREATED_BY", "")
+
+
+def _requer_api_key(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        key = request.headers.get("X-API-Key") or request.args.get("api_key")
+        if not API_KEY or key != API_KEY:
+            return jsonify({"erro": "Não autorizado"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
+def _disparar_webhook(pedido: dict):
+    """Cria uma tarefa no sistema externo (Supabase Edge Function external-insert)."""
+    if not WEBHOOK_URL or not TASK_ASSIGNED_TO or not TASK_CREATED_BY:
+        return
+
+    cliente_id  = pedido.get("cliente_id", "")
+    competencia = pedido.get("data_competencia", "")
+    valor       = pedido.get("valor_servico", "")
+    tomador     = pedido.get("inscricao_tomador", "")
+
+    # Busca o CNPJ do cliente para a Edge Function resolver o client_id
+    cliente = db.carregar_cliente(cliente_id)
+    cnpj    = (cliente or {}).get("cnpj", "")
+
+    title = f"Emitir NFS-e — {cliente_id} ({competencia})"
+    description = (
+        f"Solicitação recebida via portal.\n"
+        f"Tomador: {tomador}\n"
+        f"Valor: R$ {valor}\n"
+        f"Competência: {competencia}"
+    )
+
+    due_date = (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Suporta múltiplos responsáveis: "uuid1,uuid2,uuid3"
+    assigned = [u.strip() for u in TASK_ASSIGNED_TO.split(",") if u.strip()]
+    assigned_to = assigned if len(assigned) > 1 else assigned[0] if assigned else TASK_ASSIGNED_TO
+
+    payload = {
+        "action":      "insert_task",
+        "title":       title,
+        "description": description,
+        "assigned_to": assigned_to,
+        "created_by":  TASK_CREATED_BY,
+        "type":        "fiscal",
+        "priority":    "high",
+        "due_date":    due_date,
+    }
+    if cnpj:
+        payload["cnpj"] = cnpj
+
+    def enviar():
+        try:
+            resp = http_requests.post(
+                WEBHOOK_URL,
+                json=payload,
+                headers={"x-api-key": API_KEY},
+                timeout=10,
+            )
+            print(f"[webhook] {resp.status_code} — {resp.text[:200]}")
+        except Exception as e:
+            print(f"[webhook] Erro ao disparar: {e}")
+
+    threading.Thread(target=enviar, daemon=True).start()
 
 
 @app.route("/")
@@ -81,7 +156,11 @@ def pedido_submit(token):
         "complemento_obra":    request.form.get("complemento_obra", ""),
     }
 
-    db.criar_pedido(token, info["cliente_id"], dados)
+    pedido_id = db.criar_pedido(token, info["cliente_id"], dados)
+
+    pedido_completo = db.get_pedido(pedido_id)
+    if pedido_completo:
+        _disparar_webhook(pedido_completo)
 
     return redirect(url_for("pedido_confirmacao", token=token))
 
@@ -136,6 +215,43 @@ def pedidos_json():
     cliente_id = request.args.get("cliente_id", "")
     pedidos = db.get_pedidos(cliente_id=cliente_id if cliente_id else None)
     return jsonify(pedidos)
+
+
+# ──────────────────────────────────────────────────────────────
+# API REST (para sistemas externos)
+# ──────────────────────────────────────────────────────────────
+
+@app.route("/api/pedidos", methods=["GET"])
+@_requer_api_key
+def api_listar_pedidos():
+    """Lista pedidos. Filtros: ?status=pendente&cliente_id=XXX"""
+    status     = request.args.get("status")
+    cliente_id = request.args.get("cliente_id")
+    pedidos = db.get_pedidos(cliente_id=cliente_id, status=status)
+    return jsonify(pedidos)
+
+
+@app.route("/api/pedidos/<int:pedido_id>", methods=["GET"])
+@_requer_api_key
+def api_get_pedido(pedido_id):
+    """Retorna um pedido específico."""
+    pedido = db.get_pedido(pedido_id)
+    if not pedido:
+        return jsonify({"erro": "Pedido não encontrado"}), 404
+    return jsonify(pedido)
+
+
+@app.route("/api/pedidos/<int:pedido_id>/status", methods=["PATCH"])
+@_requer_api_key
+def api_atualizar_status(pedido_id):
+    """Permite o sistema externo atualizar o status de um pedido."""
+    body  = request.get_json(force=True) or {}
+    novo_status = body.get("status")
+    obs         = body.get("observacao", "")
+    if novo_status not in ("pendente", "emitindo", "emitido", "erro"):
+        return jsonify({"erro": "Status inválido"}), 400
+    db.update_status(pedido_id, novo_status, obs or None)
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":

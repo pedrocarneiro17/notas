@@ -259,6 +259,7 @@ def abrir_gerenciar_clientes(root, campos, combo_clientes, var_cliente):
                                               sticky="ew", pady=(6, 0))
 
     var_nome  = tk.StringVar()
+    var_cnpj  = tk.StringVar()
     var_cert  = tk.StringVar()
     var_senha = tk.StringVar()
     var_cep   = tk.StringVar()
@@ -268,23 +269,24 @@ def abrir_gerenciar_clientes(root, campos, combo_clientes, var_cliente):
     trib_vars = [tk.StringVar()]
 
     row("Nome do cliente:", 0, var_nome)
+    row("CNPJ:", 1, var_cnpj)
 
     # Certificado com botão buscar
     tk.Label(frame_form, text="Certificado (.pfx):", font=("Segoe UI", 9),
-             bg="#f5f6fa").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
+             bg="#f5f6fa").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
     ttk.Entry(frame_form, textvariable=var_cert, width=22,
-              font=("Segoe UI", 9)).grid(row=1, column=1, sticky="ew", pady=(6, 0))
+              font=("Segoe UI", 9)).grid(row=2, column=1, sticky="ew", pady=(6, 0))
     ttk.Button(frame_form, text="📂",
                command=lambda: selecionar_certificado(var_cert)
-               ).grid(row=1, column=2, padx=(4, 0), pady=(6, 0))
+               ).grid(row=2, column=2, padx=(4, 0), pady=(6, 0))
 
-    row("Senha:", 2, var_senha, show="●")
+    row("Senha:", 3, var_senha, show="●")
 
     # CEP com máscara
     tk.Label(frame_form, text="CEP:", font=("Segoe UI", 9),
-             bg="#f5f6fa").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
+             bg="#f5f6fa").grid(row=4, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
     entry_cep_cli = ttk.Entry(frame_form, textvariable=var_cep, width=14, font=("Segoe UI", 9))
-    entry_cep_cli.grid(row=3, column=1, sticky="w", pady=(6, 0))
+    entry_cep_cli.grid(row=4, column=1, sticky="w", pady=(6, 0))
 
     _cep_cli_lock = [False]
     def _mask_cep_cli(event=None):
@@ -310,18 +312,18 @@ def abrir_gerenciar_clientes(root, campos, combo_clientes, var_cliente):
     entry_cep_cli.bind("<KeyRelease>", _mask_cep_cli)
 
     tk.Label(frame_form, text="Regime:", font=("Segoe UI", 9),
-             bg="#f5f6fa").grid(row=4, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
+             bg="#f5f6fa").grid(row=5, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
     tk.Checkbutton(
         frame_form, text="Lucro Presumido  (desmarcado = Simples Nacional)",
         variable=var_lp, bg="#f5f6fa", font=("Segoe UI", 9), activebackground="#f5f6fa"
-    ).grid(row=4, column=1, columnspan=2, sticky="w", pady=(6, 0))
+    ).grid(row=5, column=1, columnspan=2, sticky="w", pady=(6, 0))
 
     tk.Label(frame_form, text="Obra:", font=("Segoe UI", 9),
-             bg="#f5f6fa").grid(row=5, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
+             bg="#f5f6fa").grid(row=6, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
     tk.Checkbutton(
         frame_form, text="Presta serviço para obra?",
         variable=var_obra, bg="#f5f6fa", font=("Segoe UI", 9), activebackground="#f5f6fa"
-    ).grid(row=5, column=1, columnspan=2, sticky="w", pady=(6, 0))
+    ).grid(row=6, column=1, columnspan=2, sticky="w", pady=(6, 0))
 
     # ── Lista dinâmica de códigos ─────────────────────────────
     def _criar_lista_codigos(label_txt, linha, vars_list):
@@ -358,8 +360,8 @@ def abrir_gerenciar_clientes(root, campos, combo_clientes, var_cliente):
         _refresh()
         return _refresh
 
-    refresh_nbs  = _criar_lista_codigos("Códigos NBS:",      7, nbs_vars)
-    refresh_trib = _criar_lista_codigos("Cód. Tributação:",  8, trib_vars)
+    refresh_nbs  = _criar_lista_codigos("Códigos NBS:",      8, nbs_vars)
+    refresh_trib = _criar_lista_codigos("Cód. Tributação:",  9, trib_vars)
 
     def preencher_form(event=None):
         sel = listbox.curselection()
@@ -369,6 +371,7 @@ def abrir_gerenciar_clientes(root, campos, combo_clientes, var_cliente):
         dados = carregar_cliente(nome)
         if dados:
             var_nome.set(nome)
+            var_cnpj.set(dados.get("cnpj", ""))
             var_cert.set(dados.get("caminho_certificado", ""))
             var_senha.set(dados.get("senha_certificado", ""))
             var_cep.set(dados.get("cep", ""))
@@ -387,6 +390,7 @@ def abrir_gerenciar_clientes(root, campos, combo_clientes, var_cliente):
 
     def limpar_form():
         var_nome.set("")
+        var_cnpj.set("")
         var_cert.set("")
         var_senha.set("")
         var_cep.set("")
@@ -414,6 +418,7 @@ def abrir_gerenciar_clientes(root, campos, combo_clientes, var_cliente):
             messagebox.showwarning("Atenção", "Informe ao menos um Código de Tributação.", parent=win)
             return
         salvar_cliente(nome, {
+            "cnpj":                var_cnpj.get().strip(),
             "caminho_certificado": var_cert.get().strip(),
             "senha_certificado":   var_senha.get().strip(),
             "cep":                 var_cep.get().strip(),

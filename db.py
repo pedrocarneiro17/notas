@@ -52,7 +52,8 @@ def init_db():
                     lucro_presumido     BOOLEAN DEFAULT FALSE,
                     obra                BOOLEAN DEFAULT FALSE,
                     codigos_nbs         JSONB DEFAULT '[]',
-                    codigos_tributacao  JSONB DEFAULT '[]'
+                    codigos_tributacao  JSONB DEFAULT '[]',
+                    cnpj                TEXT DEFAULT ''
                 );
 
                 CREATE TABLE IF NOT EXISTS tokens (
@@ -86,6 +87,18 @@ def init_db():
                     observacao          TEXT
                 );
             """)
+        conn.commit()
+
+    # Migrações
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            for sql in [
+                "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS cnpj TEXT DEFAULT ''",
+            ]:
+                try:
+                    cur.execute(sql)
+                except Exception:
+                    pass
         conn.commit()
 
 
@@ -130,8 +143,8 @@ def salvar_cliente(nome: str, dados: dict):
             cur.execute("""
                 INSERT INTO clientes
                     (id, caminho_certificado, senha_certificado, cep,
-                     lucro_presumido, obra, codigos_nbs, codigos_tributacao)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                     lucro_presumido, obra, codigos_nbs, codigos_tributacao, cnpj)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO UPDATE SET
                     caminho_certificado = EXCLUDED.caminho_certificado,
                     senha_certificado   = EXCLUDED.senha_certificado,
@@ -139,7 +152,8 @@ def salvar_cliente(nome: str, dados: dict):
                     lucro_presumido     = EXCLUDED.lucro_presumido,
                     obra                = EXCLUDED.obra,
                     codigos_nbs         = EXCLUDED.codigos_nbs,
-                    codigos_tributacao  = EXCLUDED.codigos_tributacao
+                    codigos_tributacao  = EXCLUDED.codigos_tributacao,
+                    cnpj                = EXCLUDED.cnpj
             """, (
                 nome,
                 dados.get("caminho_certificado", ""),
@@ -149,6 +163,7 @@ def salvar_cliente(nome: str, dados: dict):
                 dados.get("obra", False),
                 json.dumps(dados.get("codigos_nbs", [])),
                 json.dumps(dados.get("codigos_tributacao", [])),
+                dados.get("cnpj", ""),
             ))
         conn.commit()
 
@@ -216,7 +231,7 @@ def criar_pedido(token: str, cliente_id: str, dados: dict):
                     %s, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, 'pendente'
-                )
+                ) RETURNING id
             """, (
                 token, cliente_id,
                 dados.get("tipo_doc_tomador", ""),
@@ -237,19 +252,25 @@ def criar_pedido(token: str, cliente_id: str, dados: dict):
                 dados.get("numero_obra", ""),
                 dados.get("complemento_obra", ""),
             ))
+            pedido_id = cur.fetchone()
+            if pedido_id:
+                pedido_id = pedido_id[0]
         conn.commit()
+    return pedido_id
 
 
-def get_pedidos(cliente_id: str = None):
+def get_pedidos(cliente_id: str = None, status: str = None):
     with _conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            filters, params = [], []
             if cliente_id:
-                cur.execute(
-                    "SELECT * FROM pedidos WHERE cliente_id = %s ORDER BY id DESC",
-                    (cliente_id,)
-                )
-            else:
-                cur.execute("SELECT * FROM pedidos ORDER BY id DESC")
+                filters.append("cliente_id = %s")
+                params.append(cliente_id)
+            if status:
+                filters.append("status = %s")
+                params.append(status)
+            where = ("WHERE " + " AND ".join(filters)) if filters else ""
+            cur.execute(f"SELECT * FROM pedidos {where} ORDER BY id DESC", params)
             return _rows(cur)
 
 
