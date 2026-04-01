@@ -277,6 +277,14 @@ function copiarLink(token, btn) {
   }
 }
 
+// Ativa tab pelo hash da URL (#tokens abre aba Clientes & Tokens)
+(function() {
+  if (window.location.hash === '#tokens') {
+    const btn = document.querySelector('.tab[onclick*="tokens"]');
+    if (btn) showTab('tokens', btn);
+  }
+})();
+
 // Carrega ao abrir
 carregarPedidos();
 // Auto-refresh a cada 10s

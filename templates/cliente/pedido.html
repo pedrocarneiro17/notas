@@ -200,6 +200,25 @@
 </div>
 
 <script>
+  /* Máscara CEP: XX.XXX-XXX */
+  function maskCep(input) {
+    let v = input.value.replace(/\D/g, '').slice(0, 8);
+    if (v.length > 5) v = v.slice(0,2) + '.' + v.slice(2,5) + '-' + v.slice(5);
+    else if (v.length > 2) v = v.slice(0,2) + '.' + v.slice(2);
+    input.value = v;
+  }
+  document.querySelectorAll('input[name="cep_tomador"], input[name="cep_obra"]').forEach(el => {
+    el.addEventListener('input', () => maskCep(el));
+  });
+
+  /* Local de prestação: só letras e espaços */
+  const localInput = document.querySelector('input[name="local_prestacao"]');
+  if (localInput) {
+    localInput.addEventListener('input', () => {
+      localInput.value = localInput.value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
+    });
+  }
+
   /* Toggle endereço do tomador */
   function toggleCepTomador(chk) {
     const bloco = document.getElementById('bloco_cep_tomador');

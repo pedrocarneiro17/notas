@@ -967,7 +967,14 @@ def main():
 
     campos["local"] = tk.StringVar(value="Ouro Preto")
     criar_label(frame, "Município de Prestação:", 6)
-    criar_entry(frame, campos["local"], 6)
+    entry_local = criar_entry(frame, campos["local"], 6)
+
+    def _so_letras_local(*_):
+        v = campos["local"].get()
+        limpo = re.sub(r"[^a-zA-ZÀ-ÿ\s]", "", v)
+        if limpo != v:
+            campos["local"].set(limpo)
+    campos["local"].trace_add("write", _so_letras_local)
 
     criar_label(frame, "Descrição do Serviço:", 7)
     campos["descricao"] = tk.Text(frame, width=38, height=3,

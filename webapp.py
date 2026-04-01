@@ -232,14 +232,14 @@ def gerar_token():
     token = str(uuid.uuid4())[:8].upper()
     db.criar_token(token, cliente_id)
 
-    return redirect(url_for("admin_index") + "#clientes")
+    return redirect(url_for("admin_index") + "#tokens")
 
 
 @app.route("/admin/excluir-token/<token>", methods=["POST"])
 def excluir_token(token):
     db.excluir_token(token)
 
-    return redirect(url_for("admin_index") + "#clientes")
+    return redirect(url_for("admin_index") + "#tokens")
 
 
 @app.route("/admin/excluir-pedido/<int:pedido_id>", methods=["POST"])
