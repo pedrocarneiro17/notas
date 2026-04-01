@@ -36,6 +36,14 @@ def _normalizar_cnpj(cnpj: str) -> str:
     return re.sub(r"\D", "", cnpj or "")
 
 
+def _formatar_cnpj(cnpj: str) -> str:
+    """Formata CNPJ para XX.XXX.XXX/XXXX-XX."""
+    d = _normalizar_cnpj(cnpj)
+    if len(d) == 14:
+        return f"{d[:2]}.{d[2:5]}.{d[5:8]}/{d[8:12]}-{d[12:]}"
+    return cnpj
+
+
 def _verificar_cliente_lovable(cnpj: str, headers: dict) -> bool:
     """Retorna True se o cliente existe no Lovable pelo CNPJ."""
     try:
@@ -46,7 +54,7 @@ def _verificar_cliente_lovable(cnpj: str, headers: dict) -> bool:
             timeout=10,
         )
         data = resp.json()
-        return bool(data.get("id"))
+        return bool(data.get("client", {}).get("id"))
     except Exception as e:
         print(f"[webhook] Erro ao verificar cliente: {e}")
         return False
@@ -64,8 +72,9 @@ def _disparar_webhook(pedido: dict):
 
     # Busca dados do cliente no nosso banco
     cliente = db.carregar_cliente(cliente_id) or {}
-    cnpj    = _normalizar_cnpj(cliente.get("cnpj", ""))
-    nome    = cliente_id  # fallback; usa o nome do cliente cadastrado
+    cnpj    = _formatar_cnpj(cliente.get("cnpj", ""))
+    nome    = cliente_id
+    print(f"[webhook] cliente_id='{cliente_id}' | cnpj_bruto='{cliente.get('cnpj','')}' | cnpj_formatado='{cnpj}'")
 
     due_date    = (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     assigned    = [u.strip() for u in TASK_ASSIGNED_TO.split(",") if u.strip()]
