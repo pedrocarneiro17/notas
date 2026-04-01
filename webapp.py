@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, Response
+from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, Response, session
 import threading
 import uuid
 import os
@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import db
 
 app = Flask(__name__, template_folder="templates")
-app.secret_key = "nfse_webapp_2024"
+app.secret_key = os.environ.get("SECRET_KEY", "nfse_webapp_2024")
 
 with app.app_context():
     db.init_db()
@@ -18,6 +18,17 @@ WEBHOOK_URL      = os.environ.get("WEBHOOK_URL", "")
 API_KEY          = os.environ.get("API_KEY", "")
 TASK_ASSIGNED_TO = os.environ.get("TASK_ASSIGNED_TO", "")
 TASK_CREATED_BY  = os.environ.get("TASK_CREATED_BY", "")
+ADMIN_USER       = os.environ.get("ADMIN_USER", "")
+ADMIN_PASS       = os.environ.get("ADMIN_PASS", "")
+
+
+def _requer_login(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logado"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
 
 
 def _requer_api_key(f):
@@ -127,7 +138,25 @@ def _disparar_webhook(pedido: dict):
 
 @app.route("/")
 def index():
-    return redirect(url_for("admin_index"))
+    return redirect(url_for("login"))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    erro = None
+    if request.method == "POST":
+        if (request.form.get("usuario") == ADMIN_USER and
+                request.form.get("senha") == ADMIN_PASS):
+            session["logado"] = True
+            return redirect(url_for("admin_index"))
+        erro = "Usuário ou senha incorretos."
+    return render_template("admin/login.html", erro=erro)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 # ──────────────────────────────────────────────────────────────
@@ -214,19 +243,23 @@ def pedido_confirmacao(token):
 # ──────────────────────────────────────────────────────────────
 
 @app.route("/admin")
+@_requer_login
 def admin_index():
-    pedidos = db.get_pedidos()
-    nomes   = db.listar_clientes()
-    tokens  = db.get_tokens()
+    pedidos  = db.get_pedidos()
+    nomes    = db.listar_clientes()
+    tokens   = sorted(db.get_tokens(), key=lambda t: t["cliente_id"].lower())
+    com_token = {t["cliente_id"] for t in tokens}
     return render_template(
         "admin/index.html",
         pedidos=pedidos,
         clientes=nomes,
         tokens=tokens,
+        com_token=com_token,
     )
 
 
 @app.route("/admin/gerar-token", methods=["POST"])
+@_requer_login
 def gerar_token():
     cliente_id = request.form["cliente_id"]
     token = str(uuid.uuid4())[:8].upper()
@@ -236,6 +269,7 @@ def gerar_token():
 
 
 @app.route("/admin/excluir-token/<token>", methods=["POST"])
+@_requer_login
 def excluir_token(token):
     db.excluir_token(token)
 
@@ -243,6 +277,7 @@ def excluir_token(token):
 
 
 @app.route("/admin/excluir-pedido/<int:pedido_id>", methods=["POST"])
+@_requer_login
 def excluir_pedido(pedido_id):
     db.excluir_pedido(pedido_id)
 
@@ -250,6 +285,7 @@ def excluir_pedido(pedido_id):
 
 
 @app.route("/admin/pedidos")
+@_requer_login
 def pedidos_json():
     cliente_id = request.args.get("cliente_id", "")
     pedidos = db.get_pedidos(cliente_id=cliente_id if cliente_id else None)

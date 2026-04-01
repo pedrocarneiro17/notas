@@ -139,7 +139,11 @@
         <select name="cliente_id" required>
           <option value="">Selecione...</option>
           {% for nome in clientes %}
-            <option value="{{ nome }}">{{ nome }}</option>
+            {% if nome in com_token %}
+              <option value="{{ nome }}" disabled style="color:#aaa">{{ nome }} (já tem token)</option>
+            {% else %}
+              <option value="{{ nome }}">{{ nome }}</option>
+            {% endif %}
           {% endfor %}
         </select>
       </div>
