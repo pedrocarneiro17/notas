@@ -118,7 +118,7 @@ def _disparar_webhook(pedido: dict):
                 headers=headers,
                 timeout=10,
             )
-            print(f"[webhook] {resp.status_code} — {resp.text[:200]}")
+            print(f"[webhook] {resp.status_code} — {resp.text}")
         except Exception as e:
             print(f"[webhook] Erro ao disparar: {e}")
 
