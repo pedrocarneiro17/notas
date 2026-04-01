@@ -384,6 +384,13 @@ def emitir_nfse(dados: dict):
         pagina.wait_for_load_state("domcontentloaded")
         time.sleep(5)  # aguarda possíveis popups ou carregamentos adicionais
 
+        # Mantém o browser aberto até o usuário fechar manualmente
+        try:
+            while contexto.pages:
+                time.sleep(2)
+        except Exception:
+            pass
+
         #pagina.locator("#btnProsseguir").click()
         #pagina.wait_for_load_state("domcontentloaded")
 
