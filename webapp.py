@@ -30,6 +30,28 @@ def _requer_api_key(f):
     return decorated
 
 
+def _normalizar_cnpj(cnpj: str) -> str:
+    """Remove formatação do CNPJ, deixa só números."""
+    import re
+    return re.sub(r"\D", "", cnpj or "")
+
+
+def _verificar_cliente_lovable(cnpj: str, headers: dict) -> bool:
+    """Retorna True se o cliente existe no Lovable pelo CNPJ."""
+    try:
+        resp = http_requests.post(
+            WEBHOOK_URL,
+            json={"action": "get_client_by_cnpj", "cnpj": cnpj},
+            headers=headers,
+            timeout=10,
+        )
+        data = resp.json()
+        return bool(data.get("id"))
+    except Exception as e:
+        print(f"[webhook] Erro ao verificar cliente: {e}")
+        return False
+
+
 def _disparar_webhook(pedido: dict):
     """Cria uma tarefa no sistema externo (Supabase Edge Function external-insert)."""
     if not WEBHOOK_URL or not TASK_ASSIGNED_TO or not TASK_CREATED_BY:
@@ -40,9 +62,15 @@ def _disparar_webhook(pedido: dict):
     valor       = pedido.get("valor_servico", "")
     tomador     = pedido.get("inscricao_tomador", "")
 
-    # Busca o CNPJ do cliente para a Edge Function resolver o client_id
-    cliente = db.carregar_cliente(cliente_id)
-    cnpj    = (cliente or {}).get("cnpj", "")
+    # Busca dados do cliente no nosso banco
+    cliente = db.carregar_cliente(cliente_id) or {}
+    cnpj    = _normalizar_cnpj(cliente.get("cnpj", ""))
+    nome    = cliente_id  # fallback; usa o nome do cliente cadastrado
+
+    due_date    = (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    assigned    = [u.strip() for u in TASK_ASSIGNED_TO.split(",") if u.strip()]
+    assigned_to = assigned if len(assigned) > 1 else assigned[0] if assigned else TASK_ASSIGNED_TO
+    headers     = {"x-api-key": API_KEY, "Content-Type": "application/json"}
 
     title = f"Emitir NFS-e ({competencia})"
     description = (
@@ -51,12 +79,6 @@ def _disparar_webhook(pedido: dict):
         f"Valor: R$ {valor}\n"
         f"Competência: {competencia}"
     )
-
-    due_date = (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    # Suporta múltiplos responsáveis: "uuid1,uuid2,uuid3"
-    assigned = [u.strip() for u in TASK_ASSIGNED_TO.split(",") if u.strip()]
-    assigned_to = assigned if len(assigned) > 1 else assigned[0] if assigned else TASK_ASSIGNED_TO
 
     payload = {
         "action":      "insert_task",
@@ -72,11 +94,19 @@ def _disparar_webhook(pedido: dict):
         payload["cnpj"] = cnpj
 
     def enviar():
+        # Só inclui o CNPJ se o cliente já existir no Lovable
+        if cnpj:
+            if _verificar_cliente_lovable(cnpj, headers):
+                payload["cnpj"] = cnpj
+                print(f"[webhook] Cliente encontrado no Lovable, vinculando à tarefa.")
+            else:
+                print(f"[webhook] Cliente não encontrado no Lovable, tarefa será criada sem cliente.")
+
         try:
             resp = http_requests.post(
                 WEBHOOK_URL,
                 json=payload,
-                headers={"x-api-key": API_KEY},
+                headers=headers,
                 timeout=10,
             )
             print(f"[webhook] {resp.status_code} — {resp.text[:200]}")
