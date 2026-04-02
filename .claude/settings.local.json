@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.gov.br)",
+      "WebFetch(domain:notagateway.com.br)",
+      "WebFetch(domain:www.nfse.gov.br)",
+      "WebFetch(domain:www.producaorestrita.nfse.gov.br)",
+      "WebFetch(domain:adn.producaorestrita.nfse.gov.br)",
+      "WebFetch(domain:adn.nfse.gov.br)",
+      "Bash(curl -L -o \"C:\\\\Users\\\\pedro\\\\Downloads\\\\municipios_nfse.xlsx\" \"https://www.gov.br/nfse/pt-br/municipios/monitoramento-adesoes/municipiosaderentes202600225.xlsx\")",
+      "Bash(curl -L -o \"C:\\\\Users\\\\pedro\\\\Downloads\\\\manual_api_nfse.pdf\" \"https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/documentacao-atual/manual-contribuintes-emissor-publico-api-sistema-nacional-nfs-e-v1-2-out2025.pdf\")",
+      "Bash(curl -L -o \"C:\\\\Users\\\\pedro\\\\Downloads\\\\layout_dps.xlsx\" \"https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/documentacao-atual/anexo_i-sefin_adn-dps_nfse-snnfse-v1-01-20260209.xlsx\")",
+      "Bash(curl -L -o \"C:\\\\Users\\\\pedro\\\\Downloads\\\\nfse_xsd.zip\" \"https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/documentacao-atual/nfse-esquemas_xsd-v1-01-20260209.zip\")",
+      "Bash(python -c \":*)"
+    ]
+  }
+}

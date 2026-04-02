@@ -53,7 +53,11 @@ def init_db():
                     obra                BOOLEAN DEFAULT FALSE,
                     codigos_nbs         JSONB DEFAULT '[]',
                     codigos_tributacao  JSONB DEFAULT '[]',
-                    cnpj                TEXT DEFAULT ''
+                    cnpj                TEXT DEFAULT '',
+                    razao_social        TEXT DEFAULT '',
+                    inscricao_municipal TEXT DEFAULT '',
+                    codigo_ibge         TEXT DEFAULT '',
+                    numero_dps          INTEGER DEFAULT 1
                 );
 
                 CREATE TABLE IF NOT EXISTS tokens (
@@ -94,6 +98,10 @@ def init_db():
         with conn.cursor() as cur:
             for sql in [
                 "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS cnpj TEXT DEFAULT ''",
+                "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS razao_social TEXT DEFAULT ''",
+                "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS inscricao_municipal TEXT DEFAULT ''",
+                "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS codigo_ibge TEXT DEFAULT ''",
+                "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS numero_dps INTEGER DEFAULT 1",
             ]:
                 try:
                     cur.execute(sql)
@@ -143,8 +151,9 @@ def salvar_cliente(nome: str, dados: dict):
             cur.execute("""
                 INSERT INTO clientes
                     (id, caminho_certificado, senha_certificado, cep,
-                     lucro_presumido, obra, codigos_nbs, codigos_tributacao, cnpj)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     lucro_presumido, obra, codigos_nbs, codigos_tributacao,
+                     cnpj, razao_social, inscricao_municipal, codigo_ibge)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO UPDATE SET
                     caminho_certificado = EXCLUDED.caminho_certificado,
                     senha_certificado   = EXCLUDED.senha_certificado,
@@ -153,7 +162,10 @@ def salvar_cliente(nome: str, dados: dict):
                     obra                = EXCLUDED.obra,
                     codigos_nbs         = EXCLUDED.codigos_nbs,
                     codigos_tributacao  = EXCLUDED.codigos_tributacao,
-                    cnpj                = EXCLUDED.cnpj
+                    cnpj                = EXCLUDED.cnpj,
+                    razao_social        = EXCLUDED.razao_social,
+                    inscricao_municipal = EXCLUDED.inscricao_municipal,
+                    codigo_ibge         = EXCLUDED.codigo_ibge
             """, (
                 nome,
                 dados.get("caminho_certificado", ""),
@@ -164,8 +176,25 @@ def salvar_cliente(nome: str, dados: dict):
                 json.dumps(dados.get("codigos_nbs", [])),
                 json.dumps(dados.get("codigos_tributacao", [])),
                 dados.get("cnpj", ""),
+                dados.get("razao_social", ""),
+                dados.get("inscricao_municipal", ""),
+                dados.get("codigo_ibge", ""),
             ))
         conn.commit()
+
+
+def proximo_numero_dps(nome: str) -> int:
+    """Retorna o próximo número sequencial de DPS e já incrementa no banco."""
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE clientes SET numero_dps = numero_dps + 1
+                WHERE id = %s
+                RETURNING numero_dps - 1
+            """, (nome,))
+            row = cur.fetchone()
+        conn.commit()
+    return row[0] if row else 1
 
 
 def deletar_cliente(nome: str):

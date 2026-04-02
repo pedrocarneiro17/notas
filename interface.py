@@ -7,7 +7,7 @@ import re
 import webbrowser
 
 from fluxo_nfse import emitir_nfse, cancelar_emissao
-from db import listar_clientes, carregar_cliente, salvar_cliente, deletar_cliente, init_db
+from db import listar_clientes, carregar_cliente, salvar_cliente, deletar_cliente, init_db, proximo_numero_dps
 
 
 # ── Servidor Web ──────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ def criar_entry(frame, var, linha, coluna=1, largura=38, show=None):
     if show:
         kwargs["show"] = show
     e = ttk.Entry(frame, **kwargs)
-    e.grid(row=linha, column=coluna, sticky="ew", pady=(6, 0))
+    e.grid(row=linha, column=coluna, sticky="w", pady=(6, 0))
     return e
 
 
@@ -85,8 +85,11 @@ def executar_emissao(dados, btn_emitir, btn_cancelar, lbl_status):
         _ui(lambda: btn_cancelar.config(state="normal"))
         _ui(lambda: lbl_status.config(text="⏳ Emissão em andamento...", fg="#e67e22"))
         try:
-            emitir_nfse(dados)
-            _ui(lambda: lbl_status.config(text="✅ NFS-e emitida com sucesso!", fg="#27ae60"))
+            # API REST desabilitada temporariamente — usando Playwright direto
+            usou_api = False
+            if not usou_api:
+                emitir_nfse(dados)
+                _ui(lambda: lbl_status.config(text="✅ NFS-e emitida com sucesso!", fg="#27ae60"))
         except Exception as e:
             msg = str(e).lower()
             if any(x in msg for x in ("target page", "browser has been closed", "target closed",
@@ -142,6 +145,11 @@ def validar_e_emitir(campos, btn_emitir, btn_cancelar, lbl_status):
             dados["senha_certificado"]   = cliente_atual.get("senha_certificado", "")
             dados["cep"]                 = cliente_atual.get("cep", "")
             dados["lucro_presumido"]     = cliente_atual.get("lucro_presumido", False)
+            dados["cnpj"]                = cliente_atual.get("cnpj", "")
+            dados["razao_social"]        = cliente_atual.get("razao_social", "")
+            dados["inscricao_municipal"] = cliente_atual.get("inscricao_municipal", "")
+            dados["codigo_ibge"]         = cliente_atual.get("codigo_ibge", "")
+            dados["nome_cliente"]        = nome_cliente.get()
 
     obrigatorios = {
         "Caminho do Certificado": dados["caminho_certificado"],
@@ -258,15 +266,15 @@ def abrir_gerenciar_clientes(root, campos, combo_clientes, var_cliente):
             ttk.Entry(frame_form, **kw).grid(row=linha, column=1, columnspan=2,
                                               sticky="ew", pady=(6, 0))
 
-    var_nome  = tk.StringVar()
-    var_cnpj  = tk.StringVar()
-    var_cert  = tk.StringVar()
-    var_senha = tk.StringVar()
-    var_cep   = tk.StringVar()
-    var_lp    = tk.BooleanVar(value=False)
-    var_obra  = tk.BooleanVar(value=False)
-    nbs_vars  = [tk.StringVar()]
-    trib_vars = [tk.StringVar()]
+    var_nome   = tk.StringVar()
+    var_cnpj   = tk.StringVar()
+    var_cert   = tk.StringVar()
+    var_senha  = tk.StringVar()
+    var_cep    = tk.StringVar()
+    var_lp     = tk.BooleanVar(value=False)
+    var_obra   = tk.BooleanVar(value=False)
+    nbs_vars   = [tk.StringVar()]
+    trib_vars  = [tk.StringVar()]
 
     row("Nome do cliente:", 0, var_nome)
     row("CNPJ:", 1, var_cnpj)
@@ -408,6 +416,10 @@ def abrir_gerenciar_clientes(root, campos, combo_clientes, var_cliente):
         nome = var_nome.get().strip()
         if not nome:
             messagebox.showwarning("Atenção", "Informe o nome do cliente.", parent=win)
+            return
+        cnpj_digits = re.sub(r"\D", "", var_cnpj.get())
+        if cnpj_digits and len(cnpj_digits) != 14:
+            messagebox.showwarning("Atenção", "CNPJ deve ter 14 dígitos.", parent=win)
             return
         codigos_nbs  = [v.get().strip() for v in nbs_vars  if v.get().strip()]
         codigos_trib = [v.get().strip() for v in trib_vars if v.get().strip()]
@@ -961,13 +973,15 @@ def main():
     criar_titulo_secao(frame, "📋  Dados da Nota Fiscal", 3)
     criar_separador(frame, 4)
 
+    W = 20   # largura padrão de todos os campos
+
     campos["data"] = tk.StringVar(value=datetime.now().strftime("%d/%m/%Y"))
-    criar_label(frame, "Data de Competência:", 5)
-    criar_entry(frame, campos["data"], 5, largura=14)
+    criar_label(frame, "Competência:", 5)
+    criar_entry(frame, campos["data"], 5, largura=11)
 
     campos["local"] = tk.StringVar(value="Ouro Preto")
-    criar_label(frame, "Município de Prestação:", 6)
-    entry_local = criar_entry(frame, campos["local"], 6)
+    criar_label(frame, "Município:", 6)
+    entry_local = criar_entry(frame, campos["local"], 6, largura=W)
 
     def _so_letras_local(*_):
         v = campos["local"].get()
@@ -976,26 +990,26 @@ def main():
             campos["local"].set(limpo)
     campos["local"].trace_add("write", _so_letras_local)
 
-    criar_label(frame, "Descrição do Serviço:", 7)
-    campos["descricao"] = tk.Text(frame, width=38, height=3,
-                                  font=("Segoe UI", 9), relief="solid", bd=1)
+    criar_label(frame, "Descrição:", 7)
+    campos["descricao"] = tk.Text(frame, width=34, height=4,
+                                  font=("Segoe UI", 9))
     campos["descricao"].grid(row=7, column=1, columnspan=2, sticky="ew", pady=(6, 0))
 
     campos["codigo_tributacao"] = tk.StringVar()
     criar_label(frame, "Cód. Tributação:", 8)
     combo_trib = ttk.Combobox(frame, textvariable=campos["codigo_tributacao"],
-                               state="readonly", width=20, font=("Segoe UI", 9))
+                               state="readonly", width=W, font=("Segoe UI", 9))
     combo_trib.grid(row=8, column=1, sticky="w", pady=(6, 0))
 
     campos["codigo_nbs"] = tk.StringVar()
     criar_label(frame, "Código NBS:", 9)
     combo_nbs = ttk.Combobox(frame, textvariable=campos["codigo_nbs"],
-                              state="readonly", width=20, font=("Segoe UI", 9))
+                              state="readonly", width=W, font=("Segoe UI", 9))
     combo_nbs.grid(row=9, column=1, sticky="w", pady=(6, 0))
 
     campos["valor"] = tk.StringVar()
-    criar_label(frame, "Valor do Serviço (R$):", 10)
-    entry_valor = criar_entry(frame, campos["valor"], 10, largura=16)
+    criar_label(frame, "Valor (R$):", 10)
+    entry_valor = criar_entry(frame, campos["valor"], 10, largura=W)
 
     _valor_lock = [False]
     def _mask_valor(event=None):
@@ -1027,9 +1041,6 @@ def main():
             _valor_lock[0] = False
 
     entry_valor.bind("<KeyRelease>", _mask_valor)
-    tk.Label(frame, text="Ex: 2.000,00", font=("Segoe UI", 8),
-             fg="#95a5a6", bg="#f5f6fa").grid(row=10, column=2, sticky="w",
-                                               padx=(6, 0), pady=(6, 0))
 
     # ── Retenção de ISSQN ─────────────────────────────────────────
     campos["retencao_issqn"] = tk.BooleanVar(value=False)
@@ -1076,7 +1087,7 @@ def main():
 
     campos["inscricao_tomador"] = tk.StringVar()
     criar_label(frame, "CPF / CNPJ:", 15)
-    entry_inscricao = criar_entry(frame, campos["inscricao_tomador"], 15, largura=22)
+    entry_inscricao = criar_entry(frame, campos["inscricao_tomador"], 15, largura=W)
 
     _insc_lock = [False]
     def _mask_inscricao(event=None):
@@ -1124,8 +1135,8 @@ def main():
     frm_cep = tk.Frame(frame, bg="#f5f6fa")
     frm_cep.grid(row=16, column=1, sticky="w")
     campos["cep_tomador"] = tk.StringVar()
-    entry_cep_tom = tk.Entry(frm_cep, textvariable=campos["cep_tomador"], width=14,
-                             font=("Segoe UI", 10), relief="solid", bd=1)
+    entry_cep_tom = ttk.Entry(frm_cep, textvariable=campos["cep_tomador"],
+                              width=14, font=("Segoe UI", 9))
     entry_cep_tom.pack(side="left")
 
     _cep_lock = [False]
@@ -1158,16 +1169,22 @@ def main():
                                   command=lambda: _toggle_cep_tomador())
     chk_sem_cep.pack(side="left", padx=(8, 0))
 
-    campos["numero_tomador"] = tk.StringVar()
-    criar_label(frame, "Número:", 17)
-    entry_num_tom = criar_entry(frame, campos["numero_tomador"], 17, largura=10)
-
+    # ── Número + Complemento na mesma linha ──────────────────────
+    campos["numero_tomador"]      = tk.StringVar()
     campos["complemento_tomador"] = tk.StringVar()
-    criar_label(frame, "Complemento:", 18)
-    entry_comp_tom = criar_entry(frame, campos["complemento_tomador"], 18, largura=16)
-    tk.Label(frame, text="opcional", font=("Segoe UI", 8),
-             fg="#95a5a6", bg="#f5f6fa").grid(row=18, column=2, sticky="w",
-                                               padx=(6, 0), pady=(6, 0))
+    criar_label(frame, "Número / Complemento:", 17)
+    frm_num_comp = tk.Frame(frame, bg="#f5f6fa")
+    frm_num_comp.grid(row=17, column=1, columnspan=2, sticky="w", pady=(6, 0))
+    entry_num_tom = ttk.Entry(frm_num_comp, textvariable=campos["numero_tomador"],
+                              width=8, font=("Segoe UI", 9))
+    entry_num_tom.pack(side="left")
+    tk.Label(frm_num_comp, text="  Complemento:", font=("Segoe UI", 9),
+             bg="#f5f6fa").pack(side="left")
+    entry_comp_tom = ttk.Entry(frm_num_comp, textvariable=campos["complemento_tomador"],
+                               width=14, font=("Segoe UI", 9))
+    entry_comp_tom.pack(side="left", padx=(4, 4))
+    tk.Label(frm_num_comp, text="opcional", font=("Segoe UI", 8),
+             fg="#95a5a6", bg="#f5f6fa").pack(side="left")
 
     def _toggle_cep_tomador():
         estado = "disabled" if campos["sem_cep_tomador"].get() else "normal"
@@ -1205,7 +1222,7 @@ def main():
 
     def toggle_obra(ativo: bool):
         if ativo:
-            frame_obra_campos.grid(row=20, column=0, columnspan=3, sticky="ew", pady=(0, 4))
+            frame_obra_campos.grid(row=19, column=0, columnspan=3, sticky="ew", pady=(0, 4))
         else:
             campos["cep_obra"].set("")
             campos["numero_obra"].set("")
@@ -1213,14 +1230,14 @@ def main():
             frame_obra_campos.grid_remove()
 
     # ── Rodapé ────────────────────────────────────────────────────
-    criar_separador(frame, 21)
+    criar_separador(frame, 20)
 
     lbl_status = tk.Label(frame, text="", font=("Segoe UI", 9),
                           bg="#f5f6fa", fg="#7f8c8d")
-    lbl_status.grid(row=22, column=0, columnspan=3, sticky="w", pady=(0, 6))
+    lbl_status.grid(row=21, column=0, columnspan=3, sticky="w", pady=(0, 6))
 
     frm_btns = tk.Frame(frame, bg="#f5f6fa")
-    frm_btns.grid(row=23, column=0, columnspan=3, pady=(4, 8))
+    frm_btns.grid(row=22, column=0, columnspan=3, pady=(4, 8))
 
     btn_emitir = tk.Button(
         frm_btns, text="▶  Emitir NFS-e",

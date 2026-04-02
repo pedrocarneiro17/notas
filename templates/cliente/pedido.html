@@ -266,27 +266,32 @@
 
   /* Limite de datas: até o dia 5 aceita mês anterior; depois só mês atual */
   (function() {
+    function fmtDate(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
     const hoje = new Date();
     const dia  = hoje.getDate();
     const ano  = hoje.getFullYear();
     const mes  = hoje.getMonth(); // 0-based
 
-    // Max: último dia do mês atual
-    const ultimoDia = new Date(ano, mes + 1, 0);
-    const maxStr = ultimoDia.toISOString().split('T')[0];
-
-    // Min: se dia <= 5, primeiro dia do mês anterior; senão, primeiro dia do mês atual
-    let minDate;
-    if (dia <= 5) {
-      minDate = new Date(ano, mes - 1, 1);
-    } else {
-      minDate = new Date(ano, mes, 1);
-    }
-    const minStr = minDate.toISOString().split('T')[0];
+    const maxStr = fmtDate(new Date(ano, mes + 1, 0)); // último dia do mês atual
+    const minStr = fmtDate(dia <= 5 ? new Date(ano, mes - 1, 1) : new Date(ano, mes, 1));
 
     const campo = document.getElementById('data_competencia');
     campo.min = minStr;
     campo.max = maxStr;
+
+    // Validação explícita — funciona no Safari que ignora min/max
+    campo.addEventListener('change', function() {
+      if (this.value && (this.value < minStr || this.value > maxStr)) {
+        alert('Data fora do período permitido.\nSelecione uma data entre ' + minStr + ' e ' + maxStr + '.');
+        this.value = '';
+      }
+    });
   })();
 
   /* Máscara valor */

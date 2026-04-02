@@ -7,16 +7,20 @@ import glob
 
 os.environ["NODE_OPTIONS"] = "--openssl-legacy-provider"
 
-_contexto_ativo = None
+_contexto_ativo    = None
+_pagina_ativa      = None
+_emissao_cancelada = False
 
 def cancelar_emissao():
-    global _contexto_ativo
-    if _contexto_ativo:
+    global _contexto_ativo, _pagina_ativa, _emissao_cancelada
+    _emissao_cancelada = True
+    if _pagina_ativa:
         try:
-            _contexto_ativo.close()
+            _pagina_ativa.close()
         except Exception:
             pass
-        _contexto_ativo = None
+        _pagina_ativa = None
+    _contexto_ativo = None
 
 
 def _pasta_base() -> str:
@@ -174,7 +178,8 @@ def emitir_nfse(dados: dict):
         perfil = os.path.join(_pasta_base(), "browser_profile")
         os.makedirs(perfil, exist_ok=True)
 
-        global _contexto_ativo
+        global _contexto_ativo, _pagina_ativa, _emissao_cancelada
+        _emissao_cancelada = False
         chrome_exe = _achar_chromium()
         launch_kwargs = dict(
             user_data_dir=perfil,
@@ -192,6 +197,7 @@ def emitir_nfse(dados: dict):
         contexto = p.chromium.launch_persistent_context(**launch_kwargs)
         _contexto_ativo = contexto
         pagina = contexto.new_page()
+        _pagina_ativa = pagina
 
         # ── [1] Login ───────────────────────────────────────────────
         print("[1] Acessando página de login...")
@@ -290,13 +296,15 @@ def emitir_nfse(dados: dict):
 
         # ── [9] Código NBS ───────────────────────────────────────────
         print(f"[10] Código NBS: {codigo_nbs}")
-        pagina.locator("#ServicoPrestado_CodigoNBS_chosen a").filter(has_text="Selecione...").click()
-        pagina.locator("#ServicoPrestado_CodigoNBS_chosen").get_by_role("textbox").filter(
-            has_text=re.compile(r"^$")
-        ).fill(codigo_nbs)
-        pagina.locator("#ServicoPrestado_CodigoNBS_chosen").get_by_role("textbox").filter(
-            has_text=re.compile(r"^$")
-        ).press("Enter")
+
+        pagina.locator("#ServicoPrestado_CodigoNBS_chosen").click()
+        time.sleep(1)
+        pagina.locator("#ServicoPrestado_CodigoNBS_chosen input").fill(codigo_nbs)
+        time.sleep(1)
+        pagina.locator("#ServicoPrestado_CodigoNBS_chosen input").press("ArrowDown")
+        time.sleep(1)
+        pagina.locator("#ServicoPrestado_CodigoNBS_chosen input").press("Enter")
+
 
         # ── [9b] Endereço da obra ────────────────────────────────────
         if obra:
@@ -384,12 +392,15 @@ def emitir_nfse(dados: dict):
         pagina.wait_for_load_state("domcontentloaded")
         time.sleep(5)  # aguarda possíveis popups ou carregamentos adicionais
 
-        # Mantém o browser aberto até o usuário fechar manualmente
+        # Mantém o browser aberto até o usuário fechar a guia manualmente
         try:
-            while contexto.pages:
-                time.sleep(2)
+            pagina.wait_for_event("close", timeout=0)
         except Exception:
             pass
+
+        _pagina_ativa = None
+        if _emissao_cancelada:
+            raise Exception("browser has been closed")
 
         #pagina.locator("#btnProsseguir").click()
         #pagina.wait_for_load_state("domcontentloaded")
