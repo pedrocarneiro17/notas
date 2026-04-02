@@ -4,7 +4,8 @@ import uuid
 import os
 import requests as http_requests
 from functools import wraps
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+import calendar
 
 import db
 
@@ -177,6 +178,16 @@ def pedido_form(token):
     codigos_trib = cliente.get("codigos_tributacao", [])
     tem_obra     = cliente.get("obra", False)
 
+    hoje = date.today()
+    if hoje.day <= 5:
+        mes_min = hoje.month - 1 if hoje.month > 1 else 12
+        ano_min = hoje.year if hoje.month > 1 else hoje.year - 1
+        data_min = date(ano_min, mes_min, 1)
+    else:
+        data_min = date(hoje.year, hoje.month, 1)
+    ultimo_dia = calendar.monthrange(hoje.year, hoje.month)[1]
+    data_max = date(hoje.year, hoje.month, ultimo_dia)
+
     return render_template(
         "cliente/pedido.html",
         token=token,
@@ -184,6 +195,8 @@ def pedido_form(token):
         codigos_nbs=codigos_nbs,
         codigos_trib=codigos_trib,
         tem_obra=tem_obra,
+        data_min=data_min.isoformat(),
+        data_max=data_max.isoformat(),
     )
 
 

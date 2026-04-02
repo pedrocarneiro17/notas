@@ -96,7 +96,8 @@
     <div class="form-row">
       <div class="form-group">
         <label>Competência *</label>
-        <input type="date" name="data_competencia" id="data_competencia" required>
+        <input type="date" name="data_competencia" id="data_competencia" required
+               min="{{ data_min }}" max="{{ data_max }}">
       </div>
       <div class="form-group">
         <label>Local de Prestação *</label>
@@ -264,28 +265,11 @@
     inscricao.placeholder = tipoDoc.value === 'CPF' ? '000.000.000-00' : '00.000.000/0000-00';
   });
 
-  /* Limite de datas: até o dia 5 aceita mês anterior; depois só mês atual */
+  /* Validação de data — min/max já vêm no HTML via servidor, funciona em iOS/Safari */
   (function() {
-    function fmtDate(d) {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    }
-
-    const hoje = new Date();
-    const dia  = hoje.getDate();
-    const ano  = hoje.getFullYear();
-    const mes  = hoje.getMonth(); // 0-based
-
-    const maxStr = fmtDate(new Date(ano, mes + 1, 0)); // último dia do mês atual
-    const minStr = fmtDate(dia <= 5 ? new Date(ano, mes - 1, 1) : new Date(ano, mes, 1));
-
-    const campo = document.getElementById('data_competencia');
-    campo.min = minStr;
-    campo.max = maxStr;
-
-    // Validação explícita — funciona no Safari que ignora min/max
+    const campo  = document.getElementById('data_competencia');
+    const minStr = campo.getAttribute('min');
+    const maxStr = campo.getAttribute('max');
     campo.addEventListener('change', function() {
       if (this.value && (this.value < minStr || this.value > maxStr)) {
         alert('Data fora do período permitido.\nSelecione uma data entre ' + minStr + ' e ' + maxStr + '.');
