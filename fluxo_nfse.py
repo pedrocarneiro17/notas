@@ -338,8 +338,15 @@ def emitir_nfse(dados: dict):
                 pagina.get_by_text("Sim").nth(2).click()
             else:
                 pagina.get_by_text("Sim").nth(3).click()
+                print("oi")
+                
             pagina.get_by_text("Retido pelo Tomador").click()
+            print("oi2")
+            
             if not lucro_presumido and aliquota_issqn:
+                print("oi3")
+                time.sleep(5)
+                pagina.locator("#ISSQN_AliquotaInformada").click()
                 pagina.locator("#ISSQN_AliquotaInformada").fill(aliquota_issqn)
 
         if lucro_presumido:
@@ -353,8 +360,6 @@ def emitir_nfse(dados: dict):
 
         # ── [12] Tributação Federal (PIS/COFINS) ─────────────────────
         print("[13] Selecionando tributação federal...")
-        if not lucro_presumido:
-            pagina.get_by_text("Não").nth(3).click()
 
         if lucro_presumido:
             pagina.locator("#TributacaoFederal_PISCofins_SituacaoTributaria_chosen a").filter(has_text="Selecione...").click()

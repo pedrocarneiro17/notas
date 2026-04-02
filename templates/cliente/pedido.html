@@ -96,8 +96,9 @@
     <div class="form-row">
       <div class="form-group">
         <label>Competência *</label>
-        <input type="date" name="data_competencia" id="data_competencia" required
-               min="{{ data_min }}" max="{{ data_max }}">
+        <input type="text" name="data_competencia" id="data_competencia" required
+               placeholder="dd/mm/aaaa" inputmode="numeric" autocomplete="off"
+               data-min="{{ data_min }}" data-max="{{ data_max }}">
       </div>
       <div class="form-group">
         <label>Local de Prestação *</label>
@@ -265,16 +266,56 @@
     inscricao.placeholder = tipoDoc.value === 'CPF' ? '000.000.000-00' : '00.000.000/0000-00';
   });
 
-  /* Validação de data — min/max já vêm no HTML via servidor, funciona em iOS/Safari */
+  /* Máscara e validação de data dd/mm/aaaa */
   (function() {
     const campo  = document.getElementById('data_competencia');
-    const minStr = campo.getAttribute('min');
-    const maxStr = campo.getAttribute('max');
-    campo.addEventListener('change', function() {
-      if (this.value && (this.value < minStr || this.value > maxStr)) {
-        alert('Data fora do período permitido.\nSelecione uma data entre ' + minStr + ' e ' + maxStr + '.');
+    const minStr = campo.dataset.min; /* yyyy-mm-dd */
+    const maxStr = campo.dataset.max;
+
+    /* Máscara: permite só dígitos e insere / automaticamente */
+    campo.addEventListener('input', function() {
+      let v = this.value.replace(/\D/g, '').slice(0, 8);
+      if (v.length > 4) v = v.slice(0,2) + '/' + v.slice(2,4) + '/' + v.slice(4);
+      else if (v.length > 2) v = v.slice(0,2) + '/' + v.slice(2);
+      this.value = v;
+    });
+
+    /* Converte dd/mm/aaaa → aaaa-mm-dd para comparação e envio */
+    function toISO(s) {
+      const p = s.split('/');
+      if (p.length !== 3 || p[2].length !== 4) return '';
+      return p[2] + '-' + p[1] + '-' + p[0];
+    }
+
+    /* Validação no blur (saiu do campo) */
+    campo.addEventListener('blur', function() {
+      const iso = toISO(this.value);
+      if (!iso) return;
+      if (iso < minStr || iso > maxStr) {
+        const [aminY, aminM, aminD] = minStr.split('-');
+        const [amaxY, amaxM, amaxD] = maxStr.split('-');
+        alert('Data fora do período permitido.\nSelecione entre ' +
+              aminD+'/'+aminM+'/'+aminY + ' e ' + amaxD+'/'+amaxM+'/'+amaxY + '.');
         this.value = '';
       }
+    });
+
+    /* Antes de enviar: converte o valor visível para aaaa-mm-dd */
+    campo.closest('form').addEventListener('submit', function(e) {
+      const iso = toISO(campo.value);
+      if (!iso) {
+        e.preventDefault();
+        alert('Informe uma data válida no formato dd/mm/aaaa.');
+        campo.focus();
+        return;
+      }
+      if (iso < minStr || iso > maxStr) {
+        e.preventDefault();
+        campo.value = '';
+        campo.focus();
+        return;
+      }
+      campo.value = iso; /* envia aaaa-mm-dd ao servidor */
     });
   })();
 
