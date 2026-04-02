@@ -1,1 +1,1 @@
-pyinstaller --onedir --windowed --name "EmissorNFSe" --add-data "templates;templates" interface.py
+pyinstaller --onedir --windowed --name "EmissorNFSe" --add-data "templates;templates" --add-data "icon.ico;." --icon "icon.ico" interface.py

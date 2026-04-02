@@ -4,6 +4,7 @@ from datetime import datetime
 import threading
 import socket
 import re
+import os
 import webbrowser
 
 from fluxo_nfse import emitir_nfse, cancelar_emissao
@@ -898,6 +899,11 @@ def main():
     init_db()
     root = tk.Tk()
     root.title("Emissor NFS-e — Portal Nacional")
+    try:
+        _ico = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
+        root.iconbitmap(_ico)
+    except Exception:
+        pass
     root.configure(bg="#f5f6fa")
     root.resizable(True, True)
     root.minsize(700, 520)
