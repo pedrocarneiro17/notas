@@ -893,6 +893,54 @@ def construir_aba_pedidos(parent, root):
     root.after(5000, _auto_refresh)
 
 
+# ── Aba Configurações ────────────────────────────────────────────────────────
+
+def _construir_aba_config(parent):
+    import config as _cfg
+
+    frm = tk.Frame(parent, bg="#f5f6fa", padx=24, pady=24)
+    frm.pack(fill="both", expand=True)
+
+    tk.Label(frm, text="Pasta de downloads", bg="#f5f6fa",
+             font=("Segoe UI", 10, "bold")).grid(row=0, column=0, columnspan=3,
+                                                  sticky="w", pady=(0, 6))
+
+    padrao = os.path.join(os.path.expanduser("~"), "Downloads")
+    var_pasta = tk.StringVar(value=_cfg.get("pasta_downloads") or padrao)
+
+    entry = ttk.Entry(frm, textvariable=var_pasta, width=50)
+    entry.grid(row=1, column=0, sticky="ew", padx=(0, 6))
+
+    def escolher():
+        pasta = filedialog.askdirectory(title="Escolher pasta de downloads",
+                                        initialdir=var_pasta.get())
+        if pasta:
+            var_pasta.set(pasta)
+
+    tk.Button(frm, text="Procurar...", command=escolher,
+              bg="#2c3e50", fg="white", relief="flat",
+              padx=10, pady=4).grid(row=1, column=1, padx=(0, 6))
+
+    lbl_ok = tk.Label(frm, text="", bg="#f5f6fa", fg="#27ae60",
+                      font=("Segoe UI", 9))
+    lbl_ok.grid(row=2, column=0, columnspan=3, sticky="w", pady=(6, 0))
+
+    def salvar():
+        pasta = var_pasta.get().strip()
+        if not pasta:
+            pasta = padrao
+            var_pasta.set(pasta)
+        _cfg.salvar("pasta_downloads", pasta)
+        lbl_ok.config(text="✅ Salvo!")
+        frm.after(2000, lambda: lbl_ok.config(text=""))
+
+    tk.Button(frm, text="Salvar", command=salvar,
+              bg="#27ae60", fg="white", relief="flat",
+              padx=14, pady=4).grid(row=1, column=2)
+
+    frm.columnconfigure(0, weight=1)
+
+
 # ── Interface principal ──────────────────────────────────────────────────────
 
 def main():
@@ -921,10 +969,13 @@ def main():
 
     aba_pedidos = tk.Frame(nb, bg="#f5f6fa")
     aba_manual  = tk.Frame(nb, bg="#f5f6fa")
+    aba_config  = tk.Frame(nb, bg="#f5f6fa")
     nb.add(aba_pedidos, text="  📋 Pedidos  ")
     nb.add(aba_manual,  text="  ✏️ Emissão Manual  ")
+    nb.add(aba_config,  text="  ⚙️ Configurações  ")
 
     construir_aba_pedidos(aba_pedidos, root)
+    _construir_aba_config(aba_config)
 
     # A aba manual recebe o frame original
     frame = tk.Frame(aba_manual, bg="#f5f6fa", padx=24, pady=16)

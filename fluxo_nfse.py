@@ -64,7 +64,8 @@ def _achar_chromium() -> str:
 
 
 def _pasta_downloads() -> str:
-    pasta = os.path.join(_pasta_base(), "downloads")
+    import config as _cfg
+    pasta = _cfg.get("pasta_downloads") or os.path.join(os.path.expanduser("~"), "Downloads")
     os.makedirs(pasta, exist_ok=True)
     return pasta
 
@@ -348,6 +349,10 @@ def emitir_nfse(dados: dict):
                 time.sleep(5)
                 pagina.locator("#ISSQN_AliquotaInformada").click()
                 pagina.locator("#ISSQN_AliquotaInformada").fill(aliquota_issqn)
+        
+        if not retencao_issqn:
+            print(f"[12] Retenção ISSQN: Não")
+            pagina.get_by_text("Não").nth(3).click()        
 
         if lucro_presumido:
             pagina.get_by_text("Não").nth(2).click()
@@ -395,7 +400,31 @@ def emitir_nfse(dados: dict):
         print("[14] Avançando para emissão final...")
         pagina.get_by_role("button", name="Avançar").click()
         pagina.wait_for_load_state("domcontentloaded")
-        time.sleep(5)  # aguarda possíveis popups ou carregamentos adicionais
+        
+        '''
+       pagina.locator("#btnProsseguir").click()
+        pagina.wait_for_load_state("domcontentloaded")
+
+        print("[15] Baixando XML...")
+        with pagina.expect_download() as dl_xml:
+            pagina.get_by_role("link", name="Baixar XML").click()
+        nome_xml = dl_xml.value.suggested_filename or "nfse.xml"
+        if not nome_xml.lower().endswith(".xml"):
+            nome_xml += ".xml"
+        dl_xml.value.save_as(os.path.join(_pasta_downloads(), nome_xml))
+        print(f"[15] XML salvo: {nome_xml}")
+
+        print("[16] Baixando DANFSe...")
+        with pagina.expect_download() as dl_pdf:
+            pagina.get_by_role("link", name="Baixar DANFSe").click()
+        nome_pdf = dl_pdf.value.suggested_filename or "nfse.pdf"
+        if not nome_pdf.lower().endswith(".pdf"):
+            nome_pdf += ".pdf"
+        dl_pdf.value.save_as(os.path.join(_pasta_downloads(), nome_pdf))
+        print(f"[16] DANFSe salvo: {nome_pdf}")
+
+        #print("✅ NFS-e emitida e arquivos salvos em /downloads")
+        '''
 
         # Mantém o browser aberto até o usuário fechar a guia manualmente
         try:
@@ -407,18 +436,5 @@ def emitir_nfse(dados: dict):
         if _emissao_cancelada:
             raise Exception("browser has been closed")
 
-        #pagina.locator("#btnProsseguir").click()
-        #pagina.wait_for_load_state("domcontentloaded")
 
-        #print("[15] Baixando XML...")
-        #with pagina.expect_download() as dl_xml:
-            #pagina.get_by_role("link", name="Baixar XML").click()
-        #dl_xml.value.save_as(os.path.join(_pasta_downloads(), dl_xml.value.suggested_filename))
-
-        #print("[16] Baixando DANFSe...")
-        #with pagina.expect_download() as dl_pdf:
-            #pagina.get_by_role("link", name="Baixar DANFSe").click()
-        #dl_pdf.value.save_as(os.path.join(_pasta_downloads(), dl_pdf.value.suggested_filename))
-
-        #print("✅ NFS-e emitida e arquivos salvos em /downloads")
         _contexto_ativo = None
