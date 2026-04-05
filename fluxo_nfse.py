@@ -197,7 +197,17 @@ def emitir_nfse(dados: dict):
             launch_kwargs["executable_path"] = chrome_exe
         contexto = p.chromium.launch_persistent_context(**launch_kwargs)
         _contexto_ativo = contexto
-        pagina = contexto.new_page()
+
+        # Fecha guias extras restauradas da sessão anterior, mantém só uma
+        paginas_existentes = contexto.pages
+        for pg in paginas_existentes[1:]:
+            try:
+                pg.close()
+            except Exception:
+                pass
+
+        # Reutiliza a aba que sobrou (ou abre uma nova se não houver nenhuma)
+        pagina = paginas_existentes[0] if paginas_existentes else contexto.new_page()
         _pagina_ativa = pagina
 
         # ── [1] Login ───────────────────────────────────────────────
