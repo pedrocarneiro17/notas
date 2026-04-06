@@ -14,4 +14,4 @@ COPY . .
 
 RUN mkdir -p /app/downloads /app/certs /app/browser_profiles
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "300", "webapp:app"]
+CMD gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --timeout 300 webapp:app
