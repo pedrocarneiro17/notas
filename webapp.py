@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, Response, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, Response, session, send_file
 import threading
 import uuid
 import os
+import re
 import requests as http_requests
 from functools import wraps
 from datetime import datetime, timedelta, date
@@ -340,6 +341,213 @@ def api_atualizar_status(pedido_id):
         return jsonify({"erro": "Status inválido"}), 400
     db.update_status(pedido_id, novo_status, obs or None)
     return jsonify({"ok": True})
+
+
+# ──────────────────────────────────────────────────────────────
+# GERENCIAMENTO DE CLIENTES (web)
+# ──────────────────────────────────────────────────────────────
+
+def _certs_path() -> str:
+    p = os.environ.get("CERTS_PATH") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "certs")
+    os.makedirs(p, exist_ok=True)
+    return p
+
+
+@app.route("/admin/clientes/json")
+@_requer_login
+def admin_clientes_json():
+    clientes = db.carregar_clientes()
+    return jsonify(list(clientes.values()))
+
+
+@app.route("/admin/clientes/salvar", methods=["POST"])
+@_requer_login
+def admin_salvar_cliente():
+    dados = {
+        "caminho_certificado": request.form.get("caminho_certificado", ""),
+        "senha_certificado":   request.form.get("senha_certificado", ""),
+        "cep":                 request.form.get("cep", ""),
+        "lucro_presumido":     request.form.get("lucro_presumido") == "1",
+        "obra":                request.form.get("obra") == "1",
+        "cnpj":                re.sub(r"\D", "", request.form.get("cnpj", "")),
+        "razao_social":        request.form.get("razao_social", ""),
+        "inscricao_municipal": request.form.get("inscricao_municipal", ""),
+        "codigo_ibge":         request.form.get("codigo_ibge", ""),
+        "codigos_nbs":         [c.strip() for c in request.form.get("codigos_nbs", "").splitlines() if c.strip()],
+        "codigos_tributacao":  [c.strip() for c in request.form.get("codigos_tributacao", "").splitlines() if c.strip()],
+    }
+    nome = request.form.get("id", "").strip()
+    if not nome:
+        return jsonify({"erro": "Nome obrigatório"}), 400
+    db.salvar_cliente(nome, dados)
+    return jsonify({"ok": True})
+
+
+@app.route("/admin/clientes/<cliente_id>/excluir", methods=["POST"])
+@_requer_login
+def admin_excluir_cliente(cliente_id):
+    db.deletar_cliente(cliente_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/admin/clientes/<cliente_id>/cert", methods=["POST"])
+@_requer_login
+def admin_upload_cert(cliente_id):
+    arq = request.files.get("cert")
+    if not arq or not arq.filename.lower().endswith(".pfx"):
+        return jsonify({"erro": "Envie um arquivo .pfx"}), 400
+    nome_arquivo = f"{cliente_id}.pfx"
+    caminho = os.path.join(_certs_path(), nome_arquivo)
+    arq.save(caminho)
+    # Atualiza o caminho no banco
+    cliente = db.carregar_cliente(cliente_id) or {}
+    cliente["caminho_certificado"] = nome_arquivo
+    db.salvar_cliente(cliente_id, cliente)
+    return jsonify({"ok": True, "arquivo": nome_arquivo})
+
+
+# ──────────────────────────────────────────────────────────────
+# EMISSÃO VIA WEB
+# ──────────────────────────────────────────────────────────────
+
+def _montar_dados_emissao(pedido: dict, cliente: dict) -> dict:
+    return {
+        "caminho_certificado": cliente.get("caminho_certificado", ""),
+        "senha_certificado":   cliente.get("senha_certificado", ""),
+        "cep":                 cliente.get("cep", ""),
+        "lucro_presumido":     cliente.get("lucro_presumido", False),
+        "obra":                cliente.get("obra", False),
+        "cnpj":                cliente.get("cnpj", ""),
+        "cliente_id":          pedido.get("cliente_id", ""),
+        "tipo_doc_tomador":    pedido.get("tipo_doc_tomador", "CPF"),
+        "inscricao_tomador":   pedido.get("inscricao_tomador", ""),
+        "sem_cep_tomador":     pedido.get("sem_cep_tomador", False),
+        "cep_tomador":         pedido.get("cep_tomador", ""),
+        "numero_tomador":      pedido.get("numero_tomador", ""),
+        "complemento_tomador": pedido.get("complemento_tomador", ""),
+        "data_competencia":    pedido.get("data_competencia", ""),
+        "local_prestacao":     pedido.get("local_prestacao", ""),
+        "descricao_servico":   pedido.get("descricao_servico", ""),
+        "valor_servico":       pedido.get("valor_servico", ""),
+        "codigo_nbs":          pedido.get("codigo_nbs", ""),
+        "codigo_tributacao":   pedido.get("codigo_tributacao", ""),
+        "retencao_issqn":      pedido.get("retencao_issqn", False),
+        "aliquota_issqn":      pedido.get("aliquota_issqn", ""),
+        "cep_obra":            pedido.get("cep_obra", ""),
+        "numero_obra":         pedido.get("numero_obra", ""),
+        "complemento_obra":    pedido.get("complemento_obra", ""),
+    }
+
+
+@app.route("/admin/emitir/<int:pedido_id>", methods=["POST"])
+@_requer_login
+def admin_emitir(pedido_id):
+    pedido = db.get_pedido(pedido_id)
+    if not pedido:
+        return jsonify({"erro": "Pedido não encontrado"}), 404
+    if pedido["status"] == "emitindo":
+        return jsonify({"erro": "Já está emitindo"}), 400
+
+    cliente = db.carregar_cliente(pedido["cliente_id"])
+    if not cliente:
+        return jsonify({"erro": "Cliente não encontrado"}), 404
+
+    db.update_status(pedido_id, "emitindo")
+    dados = _montar_dados_emissao(pedido, cliente)
+
+    def tarefa():
+        try:
+            from fluxo_nfse import emitir_nfse
+            resultado = emitir_nfse(dados)
+            db.salvar_arquivos_pedido(pedido_id, resultado.get("xml", ""), resultado.get("pdf", ""))
+            db.update_status(pedido_id, "emitido")
+        except Exception as e:
+            db.update_status(pedido_id, "erro", str(e))
+
+    threading.Thread(target=tarefa, daemon=True).start()
+    return jsonify({"ok": True})
+
+
+@app.route("/admin/emitir-manual", methods=["GET", "POST"])
+@_requer_login
+def admin_emitir_manual():
+    clientes = db.listar_clientes()
+    if request.method == "GET":
+        hoje = date.today()
+        if hoje.day <= 5:
+            mes_min = hoje.month - 1 if hoje.month > 1 else 12
+            ano_min = hoje.year if hoje.month > 1 else hoje.year - 1
+            data_min = date(ano_min, mes_min, 1)
+        else:
+            data_min = date(hoje.year, hoje.month, 1)
+        ultimo_dia = calendar.monthrange(hoje.year, hoje.month)[1]
+        data_max = date(hoje.year, hoje.month, ultimo_dia)
+        return render_template("admin/emitir_manual.html",
+                               clientes=clientes,
+                               data_min=data_min.isoformat(),
+                               data_max=data_max.isoformat())
+
+    # POST — cria pedido e dispara emissão
+    cliente_id = request.form.get("cliente_id", "")
+    cliente = db.carregar_cliente(cliente_id)
+    if not cliente:
+        return jsonify({"erro": "Cliente não encontrado"}), 404
+
+    retencao = request.form.get("retencao_issqn") == "1"
+    data_raw = request.form.get("data_competencia", "")
+    try:
+        data_fmt = datetime.strptime(data_raw, "%Y-%m-%d").strftime("%d/%m/%Y")
+    except ValueError:
+        data_fmt = data_raw
+
+    dados_pedido = {
+        "tipo_doc_tomador":    request.form.get("tipo_doc_tomador", "CPF"),
+        "inscricao_tomador":   request.form.get("inscricao_tomador", ""),
+        "sem_cep_tomador":     request.form.get("sem_cep_tomador") == "1",
+        "cep_tomador":         request.form.get("cep_tomador", ""),
+        "numero_tomador":      request.form.get("numero_tomador", ""),
+        "complemento_tomador": request.form.get("complemento_tomador", ""),
+        "data_competencia":    data_fmt,
+        "local_prestacao":     request.form.get("local_prestacao", ""),
+        "descricao_servico":   request.form.get("descricao_servico", ""),
+        "valor_servico":       request.form.get("valor_servico", ""),
+        "codigo_nbs":          request.form.get("codigo_nbs", ""),
+        "codigo_tributacao":   request.form.get("codigo_tributacao", ""),
+        "retencao_issqn":      retencao,
+        "aliquota_issqn":      request.form.get("aliquota_issqn", "") if retencao else "",
+        "cep_obra":            request.form.get("cep_obra", ""),
+        "numero_obra":         request.form.get("numero_obra", ""),
+        "complemento_obra":    request.form.get("complemento_obra", ""),
+    }
+
+    pedido_id = db.criar_pedido("manual", cliente_id, dados_pedido)
+    db.update_status(pedido_id, "emitindo")
+
+    dados_emissao = _montar_dados_emissao({**dados_pedido, "cliente_id": cliente_id}, cliente)
+
+    def tarefa():
+        try:
+            from fluxo_nfse import emitir_nfse
+            resultado = emitir_nfse(dados_emissao)
+            db.salvar_arquivos_pedido(pedido_id, resultado.get("xml", ""), resultado.get("pdf", ""))
+            db.update_status(pedido_id, "emitido")
+        except Exception as e:
+            db.update_status(pedido_id, "erro", str(e))
+
+    threading.Thread(target=tarefa, daemon=True).start()
+    return redirect(url_for("admin_index"))
+
+
+@app.route("/admin/download/<int:pedido_id>/<tipo>")
+@_requer_login
+def admin_download_arquivo(pedido_id, tipo):
+    pedido = db.get_pedido(pedido_id)
+    if not pedido:
+        abort(404)
+    caminho = pedido.get("arquivo_xml" if tipo == "xml" else "arquivo_pdf", "")
+    if not caminho or not os.path.isfile(caminho):
+        abort(404)
+    return send_file(caminho, as_attachment=True)
 
 
 if __name__ == "__main__":

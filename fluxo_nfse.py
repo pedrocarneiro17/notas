@@ -3,24 +3,10 @@ import re
 import time
 import os
 import sys
-import glob
 
 os.environ["NODE_OPTIONS"] = "--openssl-legacy-provider"
 
-_contexto_ativo    = None
-_pagina_ativa      = None
-_emissao_cancelada = False
-
-def cancelar_emissao():
-    global _contexto_ativo, _pagina_ativa, _emissao_cancelada
-    _emissao_cancelada = True
-    if _pagina_ativa:
-        try:
-            _pagina_ativa.close()
-        except Exception:
-            pass
-        _pagina_ativa = None
-    _contexto_ativo = None
+HEADLESS = os.environ.get("PLAYWRIGHT_HEADLESS", "0") == "1"
 
 
 def _pasta_base() -> str:
@@ -29,70 +15,53 @@ def _pasta_base() -> str:
     return os.path.dirname(os.path.abspath(__file__))
 
 
-def _achar_chromium() -> str:
-    """Localiza o executável do Chromium em qualquer lugar do PC."""
-    candidatos = []
-
-    # 1) Bundled pelo PyInstaller (_internal/...)
-    base = _pasta_base()
-    candidatos += glob.glob(os.path.join(
-        base, "_internal", "playwright", "driver", "package",
-        ".local-browsers", "chromium-*", "chrome-win*", "chrome.exe"
-    ))
-
-    # 2) ms-playwright padrão do Windows
-    local_app = os.environ.get("LOCALAPPDATA", "")
-    user_profile = os.environ.get("USERPROFILE", "")
-    for raiz in [local_app, user_profile]:
-        if raiz:
-            candidatos += glob.glob(os.path.join(
-                raiz, "ms-playwright", "chromium-*", "chrome-win*", "chrome.exe"
-            ))
-
-    # 3) Variável de ambiente PLAYWRIGHT_BROWSERS_PATH
-    pw_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
-    if pw_path:
-        candidatos += glob.glob(os.path.join(
-            pw_path, "chromium-*", "chrome-win*", "chrome.exe"
-        ))
-
-    # Retorna o primeiro encontrado (mais recente por nome, ordem decrescente)
-    candidatos = [c for c in candidatos if os.path.isfile(c)]
-    if candidatos:
-        return sorted(candidatos)[-1]
-    return ""  # Playwright usará o padrão interno
+def _resolver_cert(caminho: str) -> str:
+    """Resolve o caminho do certificado: absoluto ou relativo a /certs."""
+    if os.path.isabs(caminho) and os.path.isfile(caminho):
+        return caminho
+    # Tenta na pasta certs configurada ou padrão
+    certs_base = os.environ.get("CERTS_PATH") or os.path.join(_pasta_base(), "certs")
+    candidato = os.path.join(certs_base, os.path.basename(caminho))
+    if os.path.isfile(candidato):
+        return candidato
+    return caminho  # devolve o original e deixa o Playwright reportar o erro
 
 
-def _pasta_downloads() -> str:
-    import config as _cfg
-    pasta = _cfg.get("pasta_downloads") or os.path.join(os.path.expanduser("~"), "Downloads")
+def _pasta_downloads(cnpj: str = "") -> str:
+    """Pasta de downloads, organizada por CNPJ quando disponível."""
+    base = (os.environ.get("DOWNLOADS_PATH")
+            or _get_config_downloads()
+            or os.path.join(os.path.expanduser("~"), "Downloads"))
+    cnpj_limpo = re.sub(r"\D", "", cnpj)
+    pasta = os.path.join(base, cnpj_limpo) if cnpj_limpo else base
     os.makedirs(pasta, exist_ok=True)
     return pasta
 
 
+def _get_config_downloads() -> str:
+    try:
+        import config as _cfg
+        return _cfg.get("pasta_downloads", "")
+    except Exception:
+        return ""
+
+
 def _valor_para_float(valor_fmt: str) -> float:
-    """Converte '2.000,00' (BR) para float 2000.0"""
     return float(valor_fmt.replace(".", "").replace(",", "."))
 
 
 def _float_para_br(v: float) -> str:
-    """Converte float para formato BR '2.000,00'"""
     return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def _formatar_valor(valor: str) -> str:
-    """
-    Garante que o valor esteja no formato esperado pelo portal: 2.000,00
-    Aceita entradas como: "2000,00" / "2.000,00" / "2000.00" / "2000"
-    """
     valor = valor.strip().replace(" ", "")
-
     if "." in valor and "," not in valor:
         partes = valor.split(".")
-        if len(partes[-1]) == 2:      # ponto é decimal (formato americano)
+        if len(partes[-1]) == 2:
             inteiro = "".join(partes[:-1])
             decimal = partes[-1]
-        else:                          # ponto é separador de milhar
+        else:
             inteiro = valor.replace(".", "")
             decimal = "00"
     elif "," in valor:
@@ -102,14 +71,12 @@ def _formatar_valor(valor: str) -> str:
     else:
         inteiro = valor
         decimal = "00"
-
     decimal = decimal.ljust(2, "0")[:2]
     inteiro_fmt = f"{int(inteiro):,}".replace(",", ".")
     return f"{inteiro_fmt},{decimal}"
 
 
 def _is_cep_bh(cep: str) -> bool:
-    """Retorna True se o CEP pertence à faixa de Belo Horizonte (30000-000 a 31999-999)."""
     numeros = re.sub(r"\D", "", cep)
     if len(numeros) != 8:
         return False
@@ -117,42 +84,29 @@ def _is_cep_bh(cep: str) -> bool:
 
 
 def _codigo_complementar_bh(pagina, codigo_tributacao: str):
-    """Preenche o campo CodigoComplementarMunicipal para clientes de BH."""
     cod = re.sub(r"\D", "", codigo_tributacao)[:6]
-
     pagina.locator("#ServicoPrestado_CodigoComplementarMunicipal_chosen a").click()
     time.sleep(2)
-
     if cod == "171201":
         pagina.locator("#ServicoPrestado_CodigoComplementarMunicipal_chosen").get_by_text("17.12.01.003 - Administração").click()
     elif cod == "040101":
         pagina.locator("#ServicoPrestado_CodigoComplementarMunicipal_chosen").get_by_text("- Medicina").click()
 
 
-def emitir_nfse(dados: dict):
+def emitir_nfse(dados: dict) -> dict:
     """
-    Recebe um dicionário com os dados do emitente e da nota e executa o fluxo
-    de emissão no Portal Nacional de NFS-e via Playwright.
+    Executa o fluxo de emissão no Portal Nacional de NFS-e via Playwright.
+    Retorna {"xml": caminho_xml, "pdf": caminho_pdf}.
 
     Chaves esperadas em `dados`:
-        caminho_certificado (str)  - caminho absoluto do .pfx
-        senha_certificado   (str)  - senha do certificado
-        cep                 (str)  - CEP do emitente (ex: "35.402-179")
-        lucro_presumido     (bool) - True = Lucro Presumido, False = Simples Nacional
-        tipo_doc_tomador    (str)  - "CPF" ou "CNPJ"
-        inscricao_tomador   (str)  - CPF ou CNPJ do tomador (ex: "113.972.066-08")
-        data_competencia    (str)  - data no formato DD/MM/YYYY
-        local_prestacao     (str)  - nome do município (ex: "Ouro Preto")
-        descricao_servico   (str)  - texto livre de descrição
-        valor_servico       (str)  - valor formatado (ex: "200,00")
-        codigo_nbs          (str)  - código NBS (ex: "101011200")
-        codigo_tributacao   (str)  - código de tributação (ex: "01.07.01")
-        cep_tomador         (str)  - CEP do tomador (ex: "35.400-541")
-        numero_tomador      (str)  - número do endereço do tomador
-        complemento_tomador (str)  - complemento (pode ser vazio)
+        caminho_certificado, senha_certificado, cep, lucro_presumido,
+        tipo_doc_tomador, inscricao_tomador, sem_cep_tomador, cep_tomador,
+        numero_tomador, complemento_tomador, data_competencia, local_prestacao,
+        descricao_servico, valor_servico, codigo_nbs, codigo_tributacao,
+        retencao_issqn, aliquota_issqn, obra, cep_obra, numero_obra,
+        complemento_obra, cnpj (para organizar pasta), cliente_id (para perfil)
     """
-
-    caminho_cert        = dados["caminho_certificado"]
+    caminho_cert        = _resolver_cert(dados["caminho_certificado"])
     senha_cert          = dados["senha_certificado"]
     cep                 = dados["cep"]
     lucro_presumido     = dados["lucro_presumido"]
@@ -174,17 +128,16 @@ def emitir_nfse(dados: dict):
     cep_obra            = dados.get("cep_obra", "")
     numero_obra         = dados.get("numero_obra", "")
     complemento_obra    = dados.get("complemento_obra", "")
+    cnpj                = dados.get("cnpj", "")
+    cliente_id          = dados.get("cliente_id", "default")
 
     with sync_playwright() as p:
-        perfil = os.path.join(_pasta_base(), "browser_profile")
+        perfil = os.path.join(_pasta_base(), "browser_profiles", cliente_id)
         os.makedirs(perfil, exist_ok=True)
 
-        global _contexto_ativo, _pagina_ativa, _emissao_cancelada
-        _emissao_cancelada = False
-        chrome_exe = _achar_chromium()
-        launch_kwargs = dict(
+        contexto = p.chromium.launch_persistent_context(
             user_data_dir=perfil,
-            headless=False,
+            headless=HEADLESS,
             ignore_https_errors=True,
             accept_downloads=True,
             client_certificates=[{
@@ -193,12 +146,8 @@ def emitir_nfse(dados: dict):
                 "passphrase": senha_cert
             }]
         )
-        if chrome_exe:
-            launch_kwargs["executable_path"] = chrome_exe
-        contexto = p.chromium.launch_persistent_context(**launch_kwargs)
-        _contexto_ativo = contexto
 
-        # Fecha guias extras restauradas da sessão anterior, mantém só uma
+        # Fecha guias extras restauradas da sessão anterior
         paginas_existentes = contexto.pages
         for pg in paginas_existentes[1:]:
             try:
@@ -206,9 +155,7 @@ def emitir_nfse(dados: dict):
             except Exception:
                 pass
 
-        # Reutiliza a aba que sobrou (ou abre uma nova se não houver nenhuma)
         pagina = paginas_existentes[0] if paginas_existentes else contexto.new_page()
-        _pagina_ativa = pagina
 
         # ── [1] Login ───────────────────────────────────────────────
         print("[1] Acessando página de login...")
@@ -229,7 +176,7 @@ def emitir_nfse(dados: dict):
         pagina.locator("#DataCompetencia").press("Enter")
         pagina.locator("body").click()
 
-        # ── [4] Regime tributário (apenas Simples Nacional) ──────────
+        # ── [4] Regime tributário ────────────────────────────────────
         if not lucro_presumido:
             print("[5] Regime tributário: Simples Nacional")
             pagina.locator("#SimplesNacional_RegimeApuracaoTributosSN_chosen a").filter(
@@ -239,7 +186,7 @@ def emitir_nfse(dados: dict):
                 "Regime de apuração dos tributos federais e municipal pelo Simples Nacional"
             ).click()
 
-        # ── [5] Dados do emitente (CEP) ──────────────────────────────
+        # ── [5] CEP do emitente ──────────────────────────────────────
         print(f"[6] Preenchendo CEP: {cep}")
         pagina.get_by_role("button", name="Exibir detalhes do emitente").click()
         pagina.locator("#Prestador_EnderecoNacional_CEP").click()
@@ -256,7 +203,7 @@ def emitir_nfse(dados: dict):
         if not sem_cep_tomador:
             print(f"[6c] Preenchendo endereço do tomador: CEP {cep_tomador}, nº {numero_tomador}")
             digits = re.sub(r"\D", "", inscricao_tomador)
-            if len(digits) <= 11:  # CPF
+            if len(digits) <= 11:
                 pagina.locator("#pnlTomadorInformarEnderecoCheck label").click()
             campo_cep = pagina.locator("#Tomador_EnderecoNacional_CEP")
             campo_cep.click()
@@ -276,7 +223,6 @@ def emitir_nfse(dados: dict):
         pagina.get_by_role("button", name="Avançar").click()
         pagina.wait_for_load_state("domcontentloaded")
 
-    
         # ── [6] Local de prestação ───────────────────────────────────
         print(f"[7] Local de prestação: {local}")
         pagina.locator("#pnlLocalPrestacao").get_by_label("").click()
@@ -287,7 +233,7 @@ def emitir_nfse(dados: dict):
             pagina.get_by_role("searchbox", name="Search").press("ArrowDown")
         pagina.get_by_role("searchbox", name="Search").press("Enter")
 
-        # ── [7] Código de tributação (serviço) ───────────────────────
+        # ── [7] Código de tributação ─────────────────────────────────
         print(f"[8] Selecionando código de tributação {codigo_tributacao}...")
         pagina.locator("#pnlServicoPrestado").get_by_label("", exact=True).click()
         time.sleep(1)
@@ -297,17 +243,16 @@ def emitir_nfse(dados: dict):
 
         # ── [7b] Código complementar municipal (somente BH) ─────────
         if _is_cep_bh(cep):
-            print(f"[8b] CEP de BH detectado — preenchendo código complementar municipal...")
+            print("[8b] CEP de BH detectado — preenchendo código complementar municipal...")
             _codigo_complementar_bh(pagina, codigo_tributacao)
 
-        # ── [8] Dados do serviço ─────────────────────────────────────
+        # ── [8] Descrição do serviço ─────────────────────────────────
         print(f"[9] Descrição: {descricao}")
         pagina.locator("#pnlServicoPrestado").get_by_text("Não", exact=True).click()
         pagina.locator("#ServicoPrestado_Descricao").fill(descricao)
 
         # ── [9] Código NBS ───────────────────────────────────────────
         print(f"[10] Código NBS: {codigo_nbs}")
-
         pagina.locator("#ServicoPrestado_CodigoNBS_chosen").click()
         time.sleep(1)
         pagina.locator("#ServicoPrestado_CodigoNBS_chosen input").fill(codigo_nbs)
@@ -315,7 +260,6 @@ def emitir_nfse(dados: dict):
         pagina.locator("#ServicoPrestado_CodigoNBS_chosen input").press("ArrowDown")
         time.sleep(1)
         pagina.locator("#ServicoPrestado_CodigoNBS_chosen input").press("Enter")
-
 
         # ── [9b] Endereço da obra ────────────────────────────────────
         if obra:
@@ -331,51 +275,40 @@ def emitir_nfse(dados: dict):
         pagina.get_by_role("button", name="Avançar").click()
 
         # ── [10] Valor do serviço ────────────────────────────────────
-        # Normaliza: aceita tanto "2000,00" quanto "2.000,00" → garante "2.000,00"
         valor_normalizado = _formatar_valor(valor)
         print(f"[11] Valor do serviço: R$ {valor_normalizado}")
         pagina.locator("#Valores_ValorServico").fill(valor_normalizado)
-        #pagina.locator("#Valores_ValorServico").press("Enter")
         pagina.locator("body").click()
-
 
         # ── [11] Retenção de ISSQN ───────────────────────────────────
         if lucro_presumido:
             pagina.get_by_text("Não").nth(1).click()
 
         if retencao_issqn:
-            print(f"[12] Retenção ISSQN: Sim")
+            print("[12] Retenção ISSQN: Sim")
             if lucro_presumido:
                 pagina.get_by_text("Sim").nth(2).click()
             else:
                 pagina.get_by_text("Sim").nth(3).click()
-                print("oi")
-                
             pagina.get_by_text("Retido pelo Tomador").click()
-            print("oi2")
-            
             if not lucro_presumido and aliquota_issqn:
-                print("oi3")
                 time.sleep(5)
                 pagina.locator("#ISSQN_AliquotaInformada").click()
                 pagina.locator("#ISSQN_AliquotaInformada").fill(aliquota_issqn)
-        
+
         if not retencao_issqn:
-            print(f"[12] Retenção ISSQN: Não")
-            pagina.get_by_text("Não").nth(3).click()        
+            print("[12] Retenção ISSQN: Não")
+            pagina.get_by_text("Não").nth(3).click()
 
         if lucro_presumido:
             pagina.get_by_text("Não").nth(2).click()
             pagina.get_by_text("Não").nth(5).click()
-
-            
         elif obra:
             pagina.get_by_text("Não").nth(5).click()
             pagina.get_by_text("Não", exact=True).nth(3).click()
 
-        # ── [12] Tributação Federal (PIS/COFINS) ─────────────────────
+        # ── [12] Tributação Federal ──────────────────────────────────
         print("[13] Selecionando tributação federal...")
-
         if lucro_presumido:
             pagina.locator("#TributacaoFederal_PISCofins_SituacaoTributaria_chosen a").filter(has_text="Selecione...").click()
             pagina.locator("#TributacaoFederal_PISCofins_SituacaoTributaria_chosen").get_by_text("01 - Operação Tributável com").click()
@@ -386,14 +319,12 @@ def emitir_nfse(dados: dict):
             pagina.locator("#TributacaoFederal_PISCofins_AliquotaCOFINS").fill("0,300")
             pagina.locator("#TributacaoFederal_PISCofins_TipoRetencao_chosen a").filter(has_text="Selecione...").click()
             pagina.locator("#TributacaoFederal_PISCofins_TipoRetencao_chosen").get_by_text("PIS/COFINS/CSLL Retidos").click()
-            
             time.sleep(2)
             valor_float = _valor_para_float(valor_normalizado)
             irrf = pagina.locator("#TributacaoFederal_ValorIRRF")
             irrf.wait_for(state="visible", timeout=10000)
             pagina.locator("#TributacaoFederal_ValorIRRF").fill(_float_para_br(valor_float * 0.015))
-            pagina.locator("#TributacaoFederal_ValorCSLL").fill(_float_para_br(valor_float * (0.0065 + 0.03 + 0.01))
-            )
+            pagina.locator("#TributacaoFederal_ValorCSLL").fill(_float_para_br(valor_float * (0.0065 + 0.03 + 0.01)))
         else:
             pagina.evaluate("""() => {
                 const sel = document.getElementById('TributacaoFederal_PISCofins_SituacaoTributaria');
@@ -406,45 +337,38 @@ def emitir_nfse(dados: dict):
                 if (opt) { sel.value = opt.value; $(sel).trigger('change').trigger('chosen:updated'); }
             }""")
 
-        # ── [13] Salvar e baixar arquivos ────────────────────────────
+        # ── [13] Confirmar emissão ───────────────────────────────────
         print("[14] Avançando para emissão final...")
         pagina.get_by_role("button", name="Avançar").click()
         pagina.wait_for_load_state("domcontentloaded")
-        
-        '''
-       pagina.locator("#btnProsseguir").click()
+
+        print("[15] Confirmando emissão...")
+        pagina.locator("#btnProsseguir").click()
         pagina.wait_for_load_state("domcontentloaded")
 
-        print("[15] Baixando XML...")
+        # ── [14] Baixar XML ──────────────────────────────────────────
+        print("[16] Baixando XML...")
+        pasta_dl = _pasta_downloads(cnpj)
         with pagina.expect_download() as dl_xml:
             pagina.get_by_role("link", name="Baixar XML").click()
         nome_xml = dl_xml.value.suggested_filename or "nfse.xml"
         if not nome_xml.lower().endswith(".xml"):
             nome_xml += ".xml"
-        dl_xml.value.save_as(os.path.join(_pasta_downloads(), nome_xml))
-        print(f"[15] XML salvo: {nome_xml}")
+        path_xml = os.path.join(pasta_dl, nome_xml)
+        dl_xml.value.save_as(path_xml)
+        print(f"[16] XML salvo: {path_xml}")
 
-        print("[16] Baixando DANFSe...")
+        # ── [15] Baixar DANFSe ───────────────────────────────────────
+        print("[17] Baixando DANFSe...")
         with pagina.expect_download() as dl_pdf:
             pagina.get_by_role("link", name="Baixar DANFSe").click()
         nome_pdf = dl_pdf.value.suggested_filename or "nfse.pdf"
         if not nome_pdf.lower().endswith(".pdf"):
             nome_pdf += ".pdf"
-        dl_pdf.value.save_as(os.path.join(_pasta_downloads(), nome_pdf))
-        print(f"[16] DANFSe salvo: {nome_pdf}")
+        path_pdf = os.path.join(pasta_dl, nome_pdf)
+        dl_pdf.value.save_as(path_pdf)
+        print(f"[17] DANFSe salvo: {path_pdf}")
 
-        #print("✅ NFS-e emitida e arquivos salvos em /downloads")
-        '''
+        contexto.close()
 
-        # Mantém o browser aberto até o usuário fechar a guia manualmente
-        try:
-            pagina.wait_for_event("close", timeout=0)
-        except Exception:
-            pass
-
-        _pagina_ativa = None
-        if _emissao_cancelada:
-            raise Exception("browser has been closed")
-
-
-        _contexto_ativo = None
+    return {"xml": path_xml, "pdf": path_pdf}

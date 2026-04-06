@@ -102,6 +102,8 @@ def init_db():
                 "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS inscricao_municipal TEXT DEFAULT ''",
                 "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS codigo_ibge TEXT DEFAULT ''",
                 "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS numero_dps INTEGER DEFAULT 1",
+                "ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS arquivo_xml TEXT DEFAULT ''",
+                "ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS arquivo_pdf TEXT DEFAULT ''",
             ]:
                 try:
                     cur.execute(sql)
@@ -308,6 +310,16 @@ def get_pedido(pedido_id: int):
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("SELECT * FROM pedidos WHERE id = %s", (pedido_id,))
             return _row(cur)
+
+
+def salvar_arquivos_pedido(pedido_id: int, arquivo_xml: str, arquivo_pdf: str):
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE pedidos SET arquivo_xml = %s, arquivo_pdf = %s WHERE id = %s",
+                (arquivo_xml, arquivo_pdf, pedido_id),
+            )
+        conn.commit()
 
 
 def update_status(pedido_id: int, status: str, obs: str = None):
