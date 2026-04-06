@@ -628,7 +628,7 @@ def construir_aba_pedidos(parent, root):
         p = pedido_selecionado()
         if not p:
             return
-        if messagebox.askyesno("Excluir", f"Excluir pedido #{p['id']}? Esta ação não pode ser desfeita."):
+        if messagebox.askyesno("Excluir", f"Excluir pedido #{p['id']}? Esta ação não pode ser desfeita-."):
             _db.excluir_pedido(p["id"])
             atualizar_lista()
 
