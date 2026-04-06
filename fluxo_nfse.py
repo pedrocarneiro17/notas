@@ -132,7 +132,8 @@ def emitir_nfse(dados: dict) -> dict:
     cliente_id          = dados.get("cliente_id", "default")
 
     with sync_playwright() as p:
-        perfil = os.path.join(_pasta_base(), "browser_profiles", cliente_id)
+        persist = os.environ.get("PERSIST_PATH") or _pasta_base()
+        perfil = os.path.join(persist, "browser_profiles", cliente_id)
         os.makedirs(perfil, exist_ok=True)
 
         contexto = p.chromium.launch_persistent_context(
