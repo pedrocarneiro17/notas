@@ -430,7 +430,7 @@ async function carregarPedidos() {
   };
 
   tbody.innerHTML = filtrados.map(p => `
-    <tr id="row-${p.id}">
+    <tr id="row-${p.id}" data-pedido='${JSON.stringify(p).replace(/'/g,"&#39;")}'>
       <td style="color:var(--muted);font-size:.8rem">${p.id}</td>
       <td>${p.cliente_id}</td>
       <td style="font-size:.85rem">${p.inscricao_tomador}</td>
@@ -438,18 +438,15 @@ async function carregarPedidos() {
       <td>${p.data_competencia}</td>
       <td><span class="badge ${BADGE[p.status] || ''}">${p.status}</span></td>
       <td class="wrap"><span class="obs-erro">${p.observacao || ''}</span></td>
-      <td style="display:flex;gap:.3rem;flex-wrap:nowrap;align-items:center">
+      <td style="white-space:nowrap">
         <button class="btn btn-sm btn-outline" onclick="abrirNota(${p.id}, true)">Ver</button>
-        <button class="btn btn-sm" style="background:#2c3e50;color:#fff" onclick="abrirNota(${p.id}, false)">Editar</button>
+        ${p.status !== 'emitido' && p.status !== 'emitindo' ? `
+        <button class="btn btn-sm" style="background:#2c3e50;color:#fff" onclick="abrirNota(${p.id}, false)">Editar</button>` : ''}
         ${p.status === 'pendente' || p.status === 'erro' ? `
-          <button class="btn btn-primary btn-sm"
-                  onclick="emitirPedido(${p.id}, this)">Emitir</button>` : ''}
-        ${p.arquivo_xml ? `<a class="btn btn-sm" style="background:#27ae60;color:#fff"
-                  href="/admin/download/${p.id}/xml">XML</a>` : ''}
-        ${p.arquivo_pdf ? `<a class="btn btn-sm" style="background:#e67e22;color:#fff"
-                  href="/admin/download/${p.id}/pdf">PDF</a>` : ''}
-        <button class="btn btn-danger btn-sm"
-                onclick="excluirPedido(${p.id}, this)">Excluir</button>
+        <button class="btn btn-primary btn-sm" onclick="emitirPedido(${p.id}, this)">Emitir</button>` : ''}
+        ${p.arquivo_xml ? `<a class="btn btn-sm" style="background:#27ae60;color:#fff" href="/admin/download/${p.id}/xml">XML</a>` : ''}
+        ${p.arquivo_pdf ? `<a class="btn btn-sm" style="background:#e67e22;color:#fff" href="/admin/download/${p.id}/pdf">PDF</a>` : ''}
+        <button class="btn btn-danger btn-sm" onclick="excluirPedido(${p.id}, this)">Excluir</button>
       </td>
     </tr>
   `).join('');
@@ -635,8 +632,9 @@ function fromISO(s) {
 }
 
 function abrirNota(id, soLeitura) {
-  const p = _pedidosCache.find(x => x.id === id);
-  if (!p) return;
+  const row = document.getElementById('row-' + id);
+  if (!row) return;
+  const p = JSON.parse(row.dataset.pedido);
   document.getElementById('mn-id').textContent        = p.id;
   document.getElementById('mn-pedido-id').value       = p.id;
   document.getElementById('mn-tipo-doc').value        = p.tipo_doc_tomador || 'CPF';
