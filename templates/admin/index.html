@@ -642,9 +642,9 @@ function fromISO(s) {
 }
 
 function abrirNota(id, soLeitura) {
+  try {
   const p = _pedidosMap[id];
-  if (!p) return;
-  document.getElementById('mn-id').textContent        = p.id;
+  if (!p) { console.warn('[abrirNota] pedido não encontrado para id:', id); return; }
   document.getElementById('mn-pedido-id').value       = p.id;
   document.getElementById('mn-tipo-doc').value        = p.tipo_doc_tomador || 'CPF';
   document.getElementById('mn-inscricao').value       = p.inscricao_tomador || '';
@@ -676,6 +676,8 @@ function abrirNota(id, soLeitura) {
   const modalNota = document.getElementById('modal-nota');
   modalNota.style.pointerEvents = '';
   modalNota.style.display = 'block';
+  console.log('[abrirNota] modal display:', modalNota.style.display, 'pointerEvents:', modalNota.style.pointerEvents);
+  } catch(err) { console.error('[abrirNota ERRO]', err); }
 }
 
 function fecharModalNota() {
