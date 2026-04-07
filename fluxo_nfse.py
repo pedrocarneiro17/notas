@@ -226,7 +226,7 @@ def emitir_nfse(dados: dict) -> dict:
         pagina.get_by_role("searchbox", name="Search").press("CapsLock")
         pagina.get_by_role("searchbox", name="Search").fill(local)
         time.sleep(1)
-        if local.strip().lower() in ("ouro preto", "mariana"):
+        if local.strip().lower() in ("ouro preto", "mariana", "congonhas"):
             pagina.get_by_role("searchbox", name="Search").press("ArrowDown")
         pagina.get_by_role("searchbox", name="Search").press("Enter")
 
