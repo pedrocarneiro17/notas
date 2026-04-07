@@ -405,6 +405,7 @@ async function carregarPedidos() {
   const res     = await fetch(url);
   const pedidos = await res.json();
   _pedidosCache = pedidos;
+  pedidos.forEach(p => { _pedidosMap[p.id] = p; });
 
   // Filtro de status no front
   const filtrados = status ? pedidos.filter(p => p.status === status) : pedidos;
@@ -430,8 +431,11 @@ async function carregarPedidos() {
     erro:      'badge-erro',
   };
 
+  _pedidosMap = {};
+  filtrados.forEach(p => { _pedidosMap[p.id] = p; });
+
   tbody.innerHTML = filtrados.map(p => `
-    <tr id="row-${p.id}" data-pedido='${JSON.stringify(p).replace(/'/g,"&#39;")}'>
+    <tr id="row-${p.id}">
       <td style="color:var(--muted);font-size:.8rem">${p.id}</td>
       <td>${p.cliente_id}</td>
       <td style="font-size:.85rem">${p.inscricao_tomador}</td>
@@ -620,6 +624,7 @@ document.getElementById('modal-cliente').addEventListener('click', function(e) {
 
 /* ── Ver / Editar Nota ── */
 let _pedidosCache = [];
+let _pedidosMap   = {};
 
 function toggleAliquota() {
   const v = document.getElementById('mn-retencao').value;
@@ -637,9 +642,8 @@ function fromISO(s) {
 }
 
 function abrirNota(id, soLeitura) {
-  const row = document.getElementById('row-' + id);
-  if (!row) return;
-  const p = JSON.parse(row.dataset.pedido);
+  const p = _pedidosMap[id];
+  if (!p) return;
   document.getElementById('mn-id').textContent        = p.id;
   document.getElementById('mn-pedido-id').value       = p.id;
   document.getElementById('mn-tipo-doc').value        = p.tipo_doc_tomador || 'CPF';
