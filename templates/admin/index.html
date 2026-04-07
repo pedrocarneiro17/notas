@@ -144,7 +144,7 @@
           <th style="width:110px">Competência</th>
           <th style="width:90px">Status</th>
           <th>Obs</th>
-          <th style="width:180px"></th>
+          <th style="width:300px"></th>
         </tr>
       </thead>
       <tbody id="tbody-pedidos">
@@ -438,7 +438,7 @@ async function carregarPedidos() {
       <td>${p.data_competencia}</td>
       <td><span class="badge ${BADGE[p.status] || ''}">${p.status}</span></td>
       <td class="wrap"><span class="obs-erro">${p.observacao || ''}</span></td>
-      <td style="display:flex;gap:.35rem;flex-wrap:wrap">
+      <td style="display:flex;gap:.3rem;flex-wrap:nowrap;align-items:center">
         <button class="btn btn-sm btn-outline" onclick="abrirNota(${p.id}, true)">Ver</button>
         <button class="btn btn-sm" style="background:#2c3e50;color:#fff" onclick="abrirNota(${p.id}, false)">Editar</button>
         ${p.status === 'pendente' || p.status === 'erro' ? `
@@ -671,6 +671,9 @@ function abrirNota(id, soLeitura) {
 
 function fecharModalNota() {
   document.getElementById('modal-nota').style.display = 'none';
+  document.getElementById('form-nota').querySelectorAll('input,select,textarea').forEach(el => {
+    el.disabled = false;
+  });
 }
 document.getElementById('modal-nota').addEventListener('click', function(e) {
   if (e.target === this) fecharModalNota();
