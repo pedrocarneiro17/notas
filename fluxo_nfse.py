@@ -39,11 +39,7 @@ def _pasta_downloads(cnpj: str = "") -> str:
 
 
 def _get_config_downloads() -> str:
-    try:
-        import config as _cfg
-        return _cfg.get("pasta_downloads", "")
-    except Exception:
-        return ""
+    return ""
 
 
 def _valor_para_float(valor_fmt: str) -> float:
@@ -339,7 +335,7 @@ def emitir_nfse(dados: dict) -> dict:
             }""")
 
         # ── [13] Confirmar emissão ───────────────────────────────────
-        print("[14] Avançando para emissão final...")
+        '''print("[14] Avançando para emissão final...")
         pagina.get_by_role("button", name="Avançar").click()
         pagina.wait_for_load_state("domcontentloaded")
 
@@ -368,8 +364,8 @@ def emitir_nfse(dados: dict) -> dict:
             nome_pdf += ".pdf"
         path_pdf = os.path.join(pasta_dl, nome_pdf)
         dl_pdf.value.save_as(path_pdf)
-        print(f"[17] DANFSe salvo: {path_pdf}")
+        print(f"[17] DANFSe salvo: {path_pdf}")'''
 
         contexto.close()
 
-    return {"xml": path_xml, "pdf": path_pdf}
+    #return {"xml": path_xml, "pdf": path_pdf}

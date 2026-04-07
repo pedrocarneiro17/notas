@@ -4,10 +4,18 @@
 
 {% block head %}
 <style>
+  /* Layout admin mais largo */
+  main { max-width: 1300px !important; padding: 0 1.5rem !important; }
+  .card { padding: 1.1rem 1.25rem; margin-bottom: 1rem; }
+  .card-title { margin-bottom: .9rem; padding-bottom: .6rem; }
+  .counts { display: flex; flex-direction: row; margin-bottom: 1.25rem; gap: 1rem; }
+  .count-card { padding: 1rem 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,.07); border-radius: 10px; background:#fff; flex:1; }
+  .count-card .num { font-size: 1.75rem; font-weight: 700; }
+
   /* Tabs */
-  .tabs { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
+  .tabs { display: flex; gap: .5rem; margin-bottom: 1rem; align-items: center; }
   .tab {
-    padding: .5rem 1.2rem; border-radius: 8px; cursor: pointer;
+    padding: .45rem 1.1rem; border-radius: 8px; cursor: pointer;
     font-size: .875rem; font-weight: 600;
     border: 1.5px solid var(--border); background: #fff; color: var(--muted);
     transition: all .15s;
@@ -17,36 +25,31 @@
   .tab-pane.active { display: block; }
 
   /* Filtro */
-  .filtro-bar {
-    display: flex; gap: .75rem; align-items: center;
-    margin-bottom: 1rem;
-  }
+  .filtro-bar { display: flex; gap: .75rem; align-items: center; margin-bottom: .75rem; }
   .filtro-bar select, .filtro-bar input {
-    padding: .45rem .75rem; border: 1.5px solid var(--border);
+    padding: .4rem .7rem; border: 1.5px solid var(--border);
     border-radius: 8px; font-size: .875rem; background: #fff;
   }
-  .filtro-bar select:focus, .filtro-bar input:focus {
-    outline: none; border-color: var(--primary);
-  }
+  .filtro-bar select:focus, .filtro-bar input:focus { outline: none; border-color: var(--primary); }
+
+  /* Tabela compacta */
+  th { padding: .45rem .75rem; }
+  td { padding: .55rem .75rem; white-space: nowrap; }
+  td.wrap { white-space: normal; }
+  table { font-size: .82rem; }
 
   /* Contadores */
-  .counts { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
-  .count-card {
-    flex: 1; background: #fff; border-radius: 10px;
-    padding: 1rem 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,.07);
-    border-left: 4px solid var(--border);
-  }
+  .count-card { border-left: 4px solid var(--border); }
   .count-card.pendente { border-color: var(--warning); }
   .count-card.emitido  { border-color: var(--success); }
   .count-card.erro     { border-color: var(--danger);  }
-  .count-card .num { font-size: 1.75rem; font-weight: 700; }
-  .count-card .lbl { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .count-card .lbl { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 
   /* Token badge */
   .token-badge {
     font-family: monospace; letter-spacing: .08em;
     background: #f3f4f6; padding: .2rem .55rem;
-    border-radius: 6px; font-size: .85rem;
+    border-radius: 6px; font-size: .82rem;
   }
   .btn-copy {
     background: none; border: none; cursor: pointer;
@@ -54,8 +57,31 @@
     padding: .2rem .4rem; border-radius: 4px;
   }
   .btn-copy:hover { background: #eef2ff; }
+  .obs-erro { font-size: .72rem; color: var(--danger); max-width: 200px; display: block; }
 
-  .obs-erro { font-size: .75rem; color: var(--danger); max-width: 220px; display: block; margin-top: .25rem; }
+  /* Chips de código */
+  .chips-wrap {
+    display: flex; flex-wrap: wrap; gap: .35rem;
+    border: 1.5px solid var(--border); border-radius: 8px;
+    padding: .4rem .6rem; min-height: 38px; background: #fff;
+    align-items: center;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: .25rem;
+    background: #eef2ff; color: var(--primary);
+    border-radius: 999px; padding: .15rem .55rem;
+    font-size: .8rem; font-weight: 600;
+  }
+  .chip button {
+    background: none; border: none; cursor: pointer;
+    color: var(--primary); font-size: .85rem; line-height: 1; padding: 0;
+  }
+  .chip-input-row { display: flex; gap: .4rem; margin-top: .35rem; }
+  .chip-input-row input {
+    flex: 1; padding: .4rem .6rem; border: 1.5px solid var(--border);
+    border-radius: 8px; font-size: .85rem;
+  }
+  .chip-input-row input:focus { outline: none; border-color: var(--primary); }
 </style>
 {% endblock %}
 
@@ -111,14 +137,14 @@
     <table>
       <thead>
         <tr>
-          <th>#</th>
-          <th>Cliente</th>
-          <th>Tomador</th>
-          <th>Valor</th>
-          <th>Competência</th>
-          <th>Status</th>
+          <th style="width:40px">#</th>
+          <th style="width:140px">Cliente</th>
+          <th style="width:160px">Tomador</th>
+          <th style="width:100px">Valor</th>
+          <th style="width:110px">Competência</th>
+          <th style="width:90px">Status</th>
           <th>Obs</th>
-          <th></th>
+          <th style="width:180px"></th>
         </tr>
       </thead>
       <tbody id="tbody-pedidos">
@@ -203,7 +229,14 @@
     </div>
     <div class="table-wrap">
     <table>
-      <thead><tr><th>Nome</th><th>CNPJ</th><th>CEP</th><th>Regime</th><th>Certificado</th><th></th></tr></thead>
+      <thead><tr>
+      <th style="width:180px">Nome</th>
+      <th style="width:160px">CNPJ</th>
+      <th style="width:120px">CEP</th>
+      <th style="width:150px">Regime</th>
+      <th>Certificado</th>
+      <th style="width:140px"></th>
+    </tr></thead>
       <tbody id="tbody-clientes"><tr><td colspan="6" class="empty">Carregando...</td></tr></tbody>
     </table>
     </div>
@@ -212,43 +245,64 @@
 
 <!-- Modal cliente -->
 <div id="modal-cliente" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;overflow-y:auto">
-  <div style="background:#fff;max-width:560px;margin:2rem auto;border-radius:12px;padding:2rem">
+  <div style="background:#fff;max-width:580px;margin:2rem auto;border-radius:12px;padding:2rem">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
       <strong id="modal-titulo">Novo Cliente</strong>
       <button onclick="fecharModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
     </div>
     <form id="form-cliente" onsubmit="salvarCliente(event)">
       <input type="hidden" id="cli-id-original">
+
       <div class="form-group"><label>Nome / ID *</label><input type="text" id="cli-id" required></div>
+
       <div class="form-row">
         <div class="form-group"><label>CNPJ</label><input type="text" id="cli-cnpj" placeholder="00.000.000/0000-00"></div>
         <div class="form-group"><label>CEP *</label><input type="text" id="cli-cep" required placeholder="00.000-000"></div>
       </div>
+
       <div class="form-group"><label>Regime tributário</label>
         <select id="cli-regime">
           <option value="0">Simples Nacional</option>
           <option value="1">Lucro Presumido</option>
         </select>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label>Código(s) NBS <small>(um por linha)</small></label>
-          <textarea id="cli-nbs" rows="3"></textarea></div>
-        <div class="form-group"><label>Código(s) Tributação <small>(um por linha)</small></label>
-          <textarea id="cli-trib" rows="3"></textarea></div>
-      </div>
+
       <div class="form-group">
-        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
-          <input type="checkbox" id="cli-obra"> Exige endereço de obra
+        <label>Códigos NBS</label>
+        <div class="chips-wrap" id="chips-nbs"></div>
+        <div class="chip-input-row">
+          <input type="text" id="input-nbs" placeholder="Ex: 101011200">
+          <button type="button" class="btn btn-primary btn-sm" onclick="addChip('nbs')">+</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Códigos de Tributação</label>
+        <div class="chips-wrap" id="chips-trib"></div>
+        <div class="chip-input-row">
+          <input type="text" id="input-trib" placeholder="Ex: 01.07.01">
+          <button type="button" class="btn btn-primary btn-sm" onclick="addChip('trib')">+</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:.5rem;font-size:.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;cursor:pointer">
+          <input type="checkbox" id="cli-obra" style="width:15px;height:15px;margin:0">
+          Exige endereço de obra
         </label>
       </div>
-      <div class="form-group"><label>Senha do certificado</label>
-        <input type="password" id="cli-senha" autocomplete="new-password"></div>
-      <div class="form-group"><label>Upload certificado (.pfx)</label>
-        <input type="file" id="cli-cert-file" accept=".pfx">
-        <small id="cli-cert-atual" style="color:var(--muted)"></small>
+
+      <div class="form-row">
+        <div class="form-group"><label>Senha do certificado</label>
+          <input type="password" id="cli-senha" autocomplete="new-password"></div>
+        <div class="form-group"><label>Certificado (.pfx)</label>
+          <input type="file" id="cli-cert-file" accept=".pfx">
+          <small id="cli-cert-atual" style="color:var(--muted);font-size:.75rem"></small>
+        </div>
       </div>
-      <div style="display:flex;gap:.75rem;justify-content:flex-end;margin-top:1rem">
-        <button type="button" onclick="fecharModal()" class="btn">Cancelar</button>
+
+      <div style="display:flex;gap:.75rem;justify-content:flex-end;margin-top:1.25rem">
+        <button type="button" onclick="fecharModal()" class="btn btn-outline">Cancelar</button>
         <button type="submit" class="btn btn-primary">Salvar</button>
       </div>
     </form>
@@ -307,7 +361,7 @@ async function carregarPedidos() {
       <td>R$ ${p.valor_servico}</td>
       <td>${p.data_competencia}</td>
       <td><span class="badge ${BADGE[p.status] || ''}">${p.status}</span></td>
-      <td><span class="obs-erro">${p.observacao || ''}</span></td>
+      <td class="wrap"><span class="obs-erro">${p.observacao || ''}</span></td>
       <td style="display:flex;gap:.35rem;flex-wrap:wrap">
         ${p.status === 'pendente' || p.status === 'erro' ? `
           <button class="btn btn-primary btn-sm"
@@ -395,23 +449,50 @@ async function carregarClientes() {
   `).join('');
 }
 
+/* ── Chips ── */
+function renderChips(tipo) {
+  const wrap = document.getElementById('chips-' + tipo);
+  const vals = _chips[tipo];
+  wrap.innerHTML = vals.map((v, i) => `
+    <span class="chip">${v}
+      <button type="button" onclick="removeChip('${tipo}',${i})">×</button>
+    </span>`).join('');
+}
+function addChip(tipo) {
+  const input = document.getElementById('input-' + tipo);
+  const v = input.value.trim();
+  if (v && !_chips[tipo].includes(v)) { _chips[tipo].push(v); renderChips(tipo); }
+  input.value = '';
+  input.focus();
+}
+function removeChip(tipo, i) { _chips[tipo].splice(i, 1); renderChips(tipo); }
+// Enter adiciona chip
+['nbs','trib'].forEach(t => {
+  document.getElementById('input-' + t).addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addChip(t); }
+  });
+});
+
+let _chips = { nbs: [], trib: [] };
+
 function abrirModalCliente(id) {
   const modal = document.getElementById('modal-cliente');
   const c = id ? _clientesCache.find(x => x.id === id) : null;
-  document.getElementById('modal-titulo').textContent = c ? 'Editar Cliente' : 'Novo Cliente';
-  document.getElementById('cli-id').value           = c ? c.id : '';
-  document.getElementById('cli-id').disabled        = !!c;
-  document.getElementById('cli-id-original').value  = c ? c.id : '';
-  document.getElementById('cli-cnpj').value          = c ? c.cnpj : '';
-  document.getElementById('cli-cep').value           = c ? c.cep : '';
-  document.getElementById('cli-regime').value        = c && c.lucro_presumido ? '1' : '0';
-  document.getElementById('cli-nbs').value           = c ? (c.codigos_nbs || []).join('\n') : '';
-  document.getElementById('cli-trib').value          = c ? (c.codigos_tributacao || []).join('\n') : '';
-  document.getElementById('cli-obra').checked        = c ? !!c.obra : false;
-  document.getElementById('cli-senha').value         = c ? (c.senha_certificado || '') : '';
+  document.getElementById('modal-titulo').textContent  = c ? 'Editar Cliente' : 'Novo Cliente';
+  document.getElementById('cli-id').value              = c ? c.id : '';
+  document.getElementById('cli-id').disabled           = !!c;
+  document.getElementById('cli-id-original').value     = c ? c.id : '';
+  document.getElementById('cli-cnpj').value            = c ? c.cnpj : '';
+  document.getElementById('cli-cep').value             = c ? c.cep : '';
+  document.getElementById('cli-regime').value          = c && c.lucro_presumido ? '1' : '0';
+  document.getElementById('cli-obra').checked          = c ? !!c.obra : false;
+  document.getElementById('cli-senha').value           = c ? (c.senha_certificado || '') : '';
   document.getElementById('cli-cert-atual').textContent = c && c.caminho_certificado
     ? 'Atual: ' + c.caminho_certificado.split('/').pop().split('\\').pop() : '';
   document.getElementById('cli-cert-file').value = '';
+  _chips.nbs  = c ? [...(c.codigos_nbs  || [])] : [];
+  _chips.trib = c ? [...(c.codigos_tributacao || [])] : [];
+  renderChips('nbs'); renderChips('trib');
   modal.style.display = 'block';
 }
 
@@ -421,32 +502,26 @@ function fecharModal() {
 
 async function salvarCliente(e) {
   e.preventDefault();
-  const id = document.getElementById('cli-id-original').value || document.getElementById('cli-id').value;
+  const novoId = document.getElementById('cli-id').value;
+  const id     = document.getElementById('cli-id-original').value || novoId;
   const fd = new FormData();
-  fd.append('id',                 document.getElementById('cli-id').value);
+  fd.append('id',                 novoId);
   fd.append('cnpj',               document.getElementById('cli-cnpj').value);
   fd.append('cep',                document.getElementById('cli-cep').value);
   fd.append('lucro_presumido',    document.getElementById('cli-regime').value);
-  fd.append('codigos_nbs',        document.getElementById('cli-nbs').value);
-  fd.append('codigos_tributacao', document.getElementById('cli-trib').value);
+  fd.append('codigos_nbs',        _chips.nbs.join('\n'));
+  fd.append('codigos_tributacao', _chips.trib.join('\n'));
   fd.append('obra',               document.getElementById('cli-obra').checked ? '1' : '0');
   fd.append('senha_certificado',  document.getElementById('cli-senha').value);
-
-  // Mantém cert existente se não subiu novo
   const certAtual = _clientesCache.find(x => x.id === id);
   fd.append('caminho_certificado', certAtual ? (certAtual.caminho_certificado || '') : '');
-
   await fetch('/admin/clientes/salvar', { method: 'POST', body: fd });
-
-  // Upload do cert se selecionado
   const certFile = document.getElementById('cli-cert-file').files[0];
   if (certFile) {
     const fd2 = new FormData();
     fd2.append('cert', certFile);
-    await fetch('/admin/clientes/' + encodeURIComponent(document.getElementById('cli-id').value) + '/cert',
-                { method: 'POST', body: fd2 });
+    await fetch('/admin/clientes/' + encodeURIComponent(novoId) + '/cert', { method: 'POST', body: fd2 });
   }
-
   fecharModal();
   carregarClientes();
 }
