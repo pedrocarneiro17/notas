@@ -538,6 +538,38 @@ def admin_emitir_manual():
     return redirect(url_for("admin_index"))
 
 
+@app.route("/admin/pedidos/<int:pedido_id>/editar", methods=["POST"])
+@_requer_login
+def admin_editar_pedido(pedido_id):
+    retencao = request.form.get("retencao_issqn") == "1"
+    data_raw = request.form.get("data_competencia", "")
+    try:
+        data_fmt = datetime.strptime(data_raw, "%Y-%m-%d").strftime("%d/%m/%Y")
+    except ValueError:
+        data_fmt = data_raw
+    dados = {
+        "tipo_doc_tomador":    request.form.get("tipo_doc_tomador", "CPF"),
+        "inscricao_tomador":   request.form.get("inscricao_tomador", ""),
+        "sem_cep_tomador":     request.form.get("sem_cep_tomador") == "1",
+        "cep_tomador":         request.form.get("cep_tomador", ""),
+        "numero_tomador":      request.form.get("numero_tomador", ""),
+        "complemento_tomador": request.form.get("complemento_tomador", ""),
+        "data_competencia":    data_fmt,
+        "local_prestacao":     request.form.get("local_prestacao", ""),
+        "descricao_servico":   request.form.get("descricao_servico", ""),
+        "valor_servico":       request.form.get("valor_servico", ""),
+        "codigo_tributacao":   request.form.get("codigo_tributacao", ""),
+        "codigo_nbs":          request.form.get("codigo_nbs", ""),
+        "retencao_issqn":      retencao,
+        "aliquota_issqn":      request.form.get("aliquota_issqn", "") if retencao else "",
+        "cep_obra":            request.form.get("cep_obra", ""),
+        "numero_obra":         request.form.get("numero_obra", ""),
+        "complemento_obra":    request.form.get("complemento_obra", ""),
+    }
+    db.atualizar_pedido(pedido_id, dados)
+    return jsonify({"ok": True})
+
+
 @app.route("/admin/download/<int:pedido_id>/<tipo>")
 @_requer_login
 def admin_download_arquivo(pedido_id, tipo):

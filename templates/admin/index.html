@@ -309,6 +309,81 @@
   </div>
 </div>
 
+<!-- ── Modal Ver/Editar Nota ─────────────────────────────── -->
+<div id="modal-nota" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;overflow-y:auto">
+  <div style="background:#fff;max-width:680px;margin:2rem auto;border-radius:12px;padding:2rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+      <strong id="modal-nota-titulo">Nota #<span id="mn-id"></span></strong>
+      <button onclick="fecharModalNota()" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <form id="form-nota" onsubmit="salvarNota(event)">
+      <input type="hidden" id="mn-pedido-id">
+
+      <div class="section-label">Tomador</div>
+      <div class="form-row">
+        <div class="form-group"><label>Tipo</label>
+          <select id="mn-tipo-doc" name="tipo_doc_tomador">
+            <option value="CPF">CPF</option><option value="CNPJ">CNPJ</option>
+          </select></div>
+        <div class="form-group"><label>CPF / CNPJ</label>
+          <input type="text" id="mn-inscricao" name="inscricao_tomador"></div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group"><label>CEP</label>
+          <input type="text" id="mn-cep-tom" name="cep_tomador"></div>
+        <div class="form-group"><label>Número</label>
+          <input type="text" id="mn-num-tom" name="numero_tomador"></div>
+        <div class="form-group"><label>Complemento</label>
+          <input type="text" id="mn-comp-tom" name="complemento_tomador"></div>
+      </div>
+
+      <div class="section-label">Serviço</div>
+      <div class="form-row">
+        <div class="form-group"><label>Competência</label>
+          <input type="text" id="mn-competencia" name="data_competencia" placeholder="dd/mm/aaaa" inputmode="numeric"></div>
+        <div class="form-group"><label>Local de Prestação</label>
+          <input type="text" id="mn-local" name="local_prestacao"></div>
+      </div>
+      <div class="form-group"><label>Descrição</label>
+        <textarea id="mn-descricao" name="descricao_servico" rows="3"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Valor (R$)</label>
+          <input type="text" id="mn-valor" name="valor_servico"></div>
+        <div class="form-group"><label>Código Tributação</label>
+          <input type="text" id="mn-trib" name="codigo_tributacao"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Código NBS</label>
+          <input type="text" id="mn-nbs" name="codigo_nbs"></div>
+        <div class="form-group"><label>Retenção ISSQN</label>
+          <select id="mn-retencao" name="retencao_issqn" onchange="toggleAliquota()">
+            <option value="0">Não</option><option value="1">Sim</option>
+          </select></div>
+      </div>
+      <div class="form-group" id="mn-aliquota-wrap" style="display:none">
+        <label>Alíquota ISSQN (%)</label>
+        <input type="text" id="mn-aliquota" name="aliquota_issqn"></div>
+
+      <div id="mn-obra-wrap" style="display:none">
+        <div class="section-label">Obra</div>
+        <div class="form-row-3">
+          <div class="form-group"><label>CEP Obra</label>
+            <input type="text" id="mn-cep-obra" name="cep_obra"></div>
+          <div class="form-group"><label>Número</label>
+            <input type="text" id="mn-num-obra" name="numero_obra"></div>
+          <div class="form-group"><label>Complemento</label>
+            <input type="text" id="mn-comp-obra" name="complemento_obra"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:.75rem;justify-content:flex-end;margin-top:1.25rem">
+        <button type="button" onclick="fecharModalNota()" class="btn btn-outline">Fechar</button>
+        <button type="submit" id="mn-btn-salvar" class="btn btn-primary">Salvar alterações</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 /* ── Tabs ── */
 function showTab(name, btn) {
@@ -328,6 +403,7 @@ async function carregarPedidos() {
 
   const res     = await fetch(url);
   const pedidos = await res.json();
+  _pedidosCache = pedidos;
 
   // Filtro de status no front
   const filtrados = status ? pedidos.filter(p => p.status === status) : pedidos;
@@ -363,6 +439,8 @@ async function carregarPedidos() {
       <td><span class="badge ${BADGE[p.status] || ''}">${p.status}</span></td>
       <td class="wrap"><span class="obs-erro">${p.observacao || ''}</span></td>
       <td style="display:flex;gap:.35rem;flex-wrap:wrap">
+        <button class="btn btn-sm btn-outline" onclick="abrirNota(${p.id}, true)">Ver</button>
+        <button class="btn btn-sm" style="background:#2c3e50;color:#fff" onclick="abrirNota(${p.id}, false)">Editar</button>
         ${p.status === 'pendente' || p.status === 'erro' ? `
           <button class="btn btn-primary btn-sm"
                   onclick="emitirPedido(${p.id}, this)">Emitir</button>` : ''}
@@ -537,6 +615,86 @@ async function excluirCliente(id, btn) {
 document.getElementById('modal-cliente').addEventListener('click', function(e) {
   if (e.target === this) fecharModal();
 });
+
+/* ── Ver / Editar Nota ── */
+let _pedidosCache = [];
+
+function toggleAliquota() {
+  const v = document.getElementById('mn-retencao').value;
+  document.getElementById('mn-aliquota-wrap').style.display = v === '1' ? 'block' : 'none';
+}
+
+function toISO(s) {
+  const p = s.split('/');
+  return p.length === 3 && p[2].length === 4 ? p[2]+'-'+p[1]+'-'+p[0] : s;
+}
+function fromISO(s) {
+  if (!s) return '';
+  const p = s.split('-');
+  return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
+}
+
+function abrirNota(id, soLeitura) {
+  const p = _pedidosCache.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('mn-id').textContent        = p.id;
+  document.getElementById('mn-pedido-id').value       = p.id;
+  document.getElementById('mn-tipo-doc').value        = p.tipo_doc_tomador || 'CPF';
+  document.getElementById('mn-inscricao').value       = p.inscricao_tomador || '';
+  document.getElementById('mn-cep-tom').value         = p.cep_tomador || '';
+  document.getElementById('mn-num-tom').value         = p.numero_tomador || '';
+  document.getElementById('mn-comp-tom').value        = p.complemento_tomador || '';
+  document.getElementById('mn-competencia').value     = fromISO(p.data_competencia);
+  document.getElementById('mn-local').value           = p.local_prestacao || '';
+  document.getElementById('mn-descricao').value       = p.descricao_servico || '';
+  document.getElementById('mn-valor').value           = p.valor_servico || '';
+  document.getElementById('mn-trib').value            = p.codigo_tributacao || '';
+  document.getElementById('mn-nbs').value             = p.codigo_nbs || '';
+  document.getElementById('mn-retencao').value        = p.retencao_issqn ? '1' : '0';
+  document.getElementById('mn-aliquota').value        = p.aliquota_issqn || '';
+  toggleAliquota();
+  const temObra = !!(p.cep_obra || p.numero_obra);
+  document.getElementById('mn-obra-wrap').style.display = temObra ? 'block' : 'none';
+  document.getElementById('mn-cep-obra').value        = p.cep_obra || '';
+  document.getElementById('mn-num-obra').value        = p.numero_obra || '';
+  document.getElementById('mn-comp-obra').value       = p.complemento_obra || '';
+
+  // Modo leitura ou edição
+  document.getElementById('form-nota').querySelectorAll('input,select,textarea').forEach(el => {
+    el.disabled = soLeitura;
+  });
+  document.getElementById('mn-btn-salvar').style.display = soLeitura ? 'none' : 'inline-flex';
+  document.getElementById('modal-nota-titulo').textContent =
+    (soLeitura ? 'Nota #' : 'Editar Nota #') + p.id + ' — ' + p.cliente_id;
+  document.getElementById('modal-nota').style.display = 'block';
+}
+
+function fecharModalNota() {
+  document.getElementById('modal-nota').style.display = 'none';
+}
+document.getElementById('modal-nota').addEventListener('click', function(e) {
+  if (e.target === this) fecharModalNota();
+});
+
+// Máscara data no modal
+document.getElementById('mn-competencia').addEventListener('input', function() {
+  let v = this.value.replace(/\D/g, '').slice(0, 8);
+  if (v.length > 4) v = v.slice(0,2)+'/'+v.slice(2,4)+'/'+v.slice(4);
+  else if (v.length > 2) v = v.slice(0,2)+'/'+v.slice(2);
+  this.value = v;
+});
+
+async function salvarNota(e) {
+  e.preventDefault();
+  const id = document.getElementById('mn-pedido-id').value;
+  const fd = new FormData(document.getElementById('form-nota'));
+  // Converte data dd/mm/aaaa → aaaa-mm-dd
+  const dataVal = document.getElementById('mn-competencia').value;
+  fd.set('data_competencia', toISO(dataVal));
+  await fetch('/admin/pedidos/' + id + '/editar', { method: 'POST', body: fd });
+  fecharModalNota();
+  carregarPedidos();
+}
 
 // Carrega ao abrir
 carregarPedidos();
