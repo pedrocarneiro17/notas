@@ -391,6 +391,7 @@ function showTab(name, btn) {
   document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
   document.getElementById('pane-' + name).classList.add('active');
   btn.classList.add('active');
+  sessionStorage.setItem('activeTab', name);
 }
 
 /* ── Carregar pedidos via API ── */
@@ -488,11 +489,12 @@ function copiarLink(token, btn) {
   }
 }
 
-// Ativa tab pelo hash da URL (#tokens abre aba Clientes & Tokens)
+// Restaura aba ativa do sessionStorage (ou hash legado)
 (function() {
-  if (window.location.hash === '#tokens') {
-    const btn = document.querySelector('.tab[onclick*="tokens"]');
-    if (btn) showTab('tokens', btn);
+  const tab = sessionStorage.getItem('activeTab') || (window.location.hash === '#tokens' ? 'tokens' : null);
+  if (tab) {
+    const btn = document.querySelector(`.tab[onclick*="${tab}"]`);
+    if (btn) showTab(tab, btn);
   }
 })();
 
@@ -568,11 +570,14 @@ function abrirModalCliente(id) {
   _chips.nbs  = c ? [...(c.codigos_nbs  || [])] : [];
   _chips.trib = c ? [...(c.codigos_tributacao || [])] : [];
   renderChips('nbs'); renderChips('trib');
+  modal.style.pointerEvents = '';
   modal.style.display = 'block';
 }
 
 function fecharModal() {
-  document.getElementById('modal-cliente').style.display = 'none';
+  const m = document.getElementById('modal-cliente');
+  m.style.display = 'none';
+  m.style.pointerEvents = 'none';
 }
 
 async function salvarCliente(e) {
@@ -664,11 +669,15 @@ function abrirNota(id, soLeitura) {
   document.getElementById('mn-btn-salvar').style.display = soLeitura ? 'none' : 'inline-flex';
   document.getElementById('modal-nota-titulo').textContent =
     (soLeitura ? 'Nota #' : 'Editar Nota #') + p.id + ' — ' + p.cliente_id;
-  document.getElementById('modal-nota').style.display = 'block';
+  const modalNota = document.getElementById('modal-nota');
+  modalNota.style.pointerEvents = '';
+  modalNota.style.display = 'block';
 }
 
 function fecharModalNota() {
-  document.getElementById('modal-nota').style.display = 'none';
+  const m = document.getElementById('modal-nota');
+  m.style.display = 'none';
+  m.style.pointerEvents = 'none';
   document.getElementById('form-nota').querySelectorAll('input,select,textarea').forEach(el => {
     el.disabled = false;
   });
