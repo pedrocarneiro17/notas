@@ -335,11 +335,11 @@ def emitir_nfse(dados: dict) -> dict:
             }""")
 
         # ── [13] Confirmar emissão ───────────────────────────────────
-        '''print("[14] Avançando para emissão final...")
+        print("[14] Avançando para emissão final...")
         pagina.get_by_role("button", name="Avançar").click()
         pagina.wait_for_load_state("domcontentloaded")
 
-        print("[15] Confirmando emissão...")
+        '''print("[15] Confirmando emissão...")
         pagina.locator("#btnProsseguir").click()
         pagina.wait_for_load_state("domcontentloaded")
 
