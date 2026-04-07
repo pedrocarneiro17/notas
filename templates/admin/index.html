@@ -444,14 +444,14 @@ async function carregarPedidos() {
       <td><span class="badge ${BADGE[p.status] || ''}">${p.status}</span></td>
       <td class="wrap"><span class="obs-erro">${p.observacao || ''}</span></td>
       <td style="white-space:nowrap">
-        <button class="btn btn-sm btn-outline" onclick="abrirNota(${p.id}, true)">Ver</button>
+        <button type="button" class="btn btn-sm btn-outline"          data-action="ver"     data-id="${p.id}">Ver</button>
         ${p.status !== 'emitido' && p.status !== 'emitindo' ? `
-        <button class="btn btn-sm" style="background:#2c3e50;color:#fff" onclick="abrirNota(${p.id}, false)">Editar</button>` : ''}
+        <button type="button" class="btn btn-sm" style="background:#2c3e50;color:#fff" data-action="editar"  data-id="${p.id}">Editar</button>` : ''}
         ${p.status === 'pendente' || p.status === 'erro' ? `
-        <button class="btn btn-primary btn-sm" onclick="emitirPedido(${p.id}, this)">Emitir</button>` : ''}
+        <button type="button" class="btn btn-primary btn-sm"          data-action="emitir"  data-id="${p.id}">Emitir</button>` : ''}
         ${p.arquivo_xml ? `<a class="btn btn-sm" style="background:#27ae60;color:#fff" href="/admin/download/${p.id}/xml">XML</a>` : ''}
         ${p.arquivo_pdf ? `<a class="btn btn-sm" style="background:#e67e22;color:#fff" href="/admin/download/${p.id}/pdf">PDF</a>` : ''}
-        <button class="btn btn-danger btn-sm" onclick="excluirPedido(${p.id}, this)">Excluir</button>
+        <button type="button" class="btn btn-danger btn-sm"           data-action="excluir" data-id="${p.id}">Excluir</button>
       </td>
     </tr>
   `).join('');
@@ -709,6 +709,20 @@ async function salvarNota(e) {
   fecharModalNota();
   carregarPedidos();
 }
+
+/* ── Delegação de eventos na tabela de notas ── */
+document.getElementById('tbody-pedidos').addEventListener('click', function(e) {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const id     = parseInt(btn.dataset.id);
+  const action = btn.dataset.action;
+  if      (action === 'ver')    abrirNota(id, true);
+  else if (action === 'editar') abrirNota(id, false);
+  else if (action === 'emitir') emitirPedido(id, btn);
+  else if (action === 'excluir') excluirPedido(id, btn);
+});
 
 // Carrega ao abrir
 carregarPedidos();
