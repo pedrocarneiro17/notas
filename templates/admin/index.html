@@ -314,7 +314,7 @@
   <div style="background:#fff;max-width:680px;margin:2rem auto;border-radius:12px;padding:2rem">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
       <strong id="modal-nota-titulo">Nota #<span id="mn-id"></span></strong>
-      <button onclick="fecharModalNota()" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
+      <button type="button" onclick="fecharModalNota()" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
     </div>
     <form id="form-nota" onsubmit="salvarNota(event)">
       <input type="hidden" id="mn-pedido-id">
@@ -713,11 +713,13 @@ async function salvarNota(e) {
 /* ── Delegação de eventos na tabela de notas ── */
 document.getElementById('tbody-pedidos').addEventListener('click', function(e) {
   const btn = e.target.closest('button[data-action]');
+  console.log('[click tbody]', e.target, '→ btn:', btn);
   if (!btn) return;
   e.preventDefault();
   e.stopPropagation();
   const id     = parseInt(btn.dataset.id);
   const action = btn.dataset.action;
+  console.log('[action]', action, 'id:', id, 'map:', _pedidosMap[id]);
   if      (action === 'ver')    abrirNota(id, true);
   else if (action === 'editar') abrirNota(id, false);
   else if (action === 'emitir') emitirPedido(id, btn);
