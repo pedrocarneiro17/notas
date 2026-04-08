@@ -226,7 +226,12 @@ def emitir_nfse(dados: dict) -> dict:
         pagina.get_by_role("searchbox", name="Search").press("CapsLock")
         pagina.get_by_role("searchbox", name="Search").fill(local)
         time.sleep(1)
-        if local.strip().lower() in ("ouro preto", "mariana", "congonhas"):
+        _arrow_down_municipio = {
+            "ouro preto": 1, "mariana": 1, "congonhas": 1,
+            "são paulo": 3, "sao paulo": 3,
+        }
+        _n_downs = _arrow_down_municipio.get(local.strip().lower(), 0)
+        for _ in range(_n_downs):
             pagina.get_by_role("searchbox", name="Search").press("ArrowDown")
         pagina.get_by_role("searchbox", name="Search").press("Enter")
 
