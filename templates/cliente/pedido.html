@@ -47,6 +47,19 @@
 
   <form method="POST" autocomplete="off">
 
+    <!-- SELETOR TOMADOR SALVO -->
+    {% if tomadores %}
+    <div class="form-group">
+      <label>Tomador salvo</label>
+      <select id="sel_tomador" onchange="preencherTomador()">
+        <option value="">— selecionar tomador —</option>
+        {% for t in tomadores %}
+          <option value="{{ loop.index0 }}">{{ t.nome or t.inscricao }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
     <!-- TOMADOR -->
     <div class="section-label">Tomador do serviço</div>
 
@@ -202,6 +215,25 @@
 </div>
 
 <script>
+  {% if tomadores %}
+  const _tomadores = {{ tomadores | tojson }};
+  function preencherTomador() {
+    const i = document.getElementById('sel_tomador').value;
+    if (i === '') return;
+    const t = _tomadores[parseInt(i)];
+    if (!t) return;
+    document.getElementById('tipo_doc').value          = t.tipo_doc  || 'CNPJ';
+    document.getElementById('inscricao_tomador').value = t.inscricao || '';
+    document.getElementById('cep_tomador').value       = t.cep       || '';
+    document.getElementById('numero_tomador').value    = t.numero    || '';
+    document.querySelector('input[name="complemento_tomador"]').value = t.complemento || '';
+    document.getElementById('sem_cep_tomador').checked = false;
+    document.getElementById('bloco_cep_tomador').style.display = 'block';
+    document.getElementById('cep_tomador').required    = true;
+    document.getElementById('numero_tomador').required = true;
+  }
+  {% endif %}
+
   /* Máscara CEP: XX.XXX-XXX */
   function maskCep(input) {
     let v = input.value.replace(/\D/g, '').slice(0, 8);

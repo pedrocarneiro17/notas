@@ -3,6 +3,7 @@ import threading
 import uuid
 import os
 import re
+import json
 import requests as http_requests
 from functools import wraps
 from datetime import datetime, timedelta, date
@@ -178,6 +179,7 @@ def pedido_form(token):
     codigos_nbs  = cliente.get("codigos_nbs", [])
     codigos_trib = cliente.get("codigos_tributacao", [])
     tem_obra     = cliente.get("obra", False)
+    tomadores    = cliente.get("tomadores", [])
 
     hoje = date.today()
     if hoje.day <= 5:
@@ -196,6 +198,7 @@ def pedido_form(token):
         codigos_nbs=codigos_nbs,
         codigos_trib=codigos_trib,
         tem_obra=tem_obra,
+        tomadores=tomadores,
         data_min=data_min.isoformat(),
         data_max=data_max.isoformat(),
     )
@@ -375,6 +378,7 @@ def admin_salvar_cliente():
         "codigo_ibge":         request.form.get("codigo_ibge", ""),
         "codigos_nbs":         [c.strip() for c in request.form.get("codigos_nbs", "").splitlines() if c.strip()],
         "codigos_tributacao":  [c.strip() for c in request.form.get("codigos_tributacao", "").splitlines() if c.strip()],
+        "tomadores":           json.loads(request.form.get("tomadores", "[]")),
     }
     nome = request.form.get("id", "").strip()
     if not nome:

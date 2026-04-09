@@ -104,6 +104,7 @@ def init_db():
                 "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS numero_dps INTEGER DEFAULT 1",
                 "ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS arquivo_xml TEXT DEFAULT ''",
                 "ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS arquivo_pdf TEXT DEFAULT ''",
+                "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS tomadores JSONB DEFAULT '[]'",
             ]:
                 try:
                     cur.execute(sql)
@@ -129,8 +130,9 @@ def carregar_cliente(nome: str):
             if not row:
                 return None
             d = dict(row)
-            d["codigos_nbs"]         = d["codigos_nbs"]         or []
-            d["codigos_tributacao"]  = d["codigos_tributacao"]  or []
+            d["codigos_nbs"]        = d["codigos_nbs"]        or []
+            d["codigos_tributacao"] = d["codigos_tributacao"] or []
+            d["tomadores"]          = d.get("tomadores")      or []
             return d
 
 
@@ -143,6 +145,7 @@ def carregar_clientes() -> dict:
                 d = dict(row)
                 d["codigos_nbs"]        = d["codigos_nbs"]        or []
                 d["codigos_tributacao"] = d["codigos_tributacao"] or []
+                d["tomadores"]          = d.get("tomadores")      or []
                 result[d["id"]] = d
             return result
 
@@ -154,8 +157,8 @@ def salvar_cliente(nome: str, dados: dict):
                 INSERT INTO clientes
                     (id, caminho_certificado, senha_certificado, cep,
                      lucro_presumido, obra, codigos_nbs, codigos_tributacao,
-                     cnpj, razao_social, inscricao_municipal, codigo_ibge)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     cnpj, razao_social, inscricao_municipal, codigo_ibge, tomadores)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO UPDATE SET
                     caminho_certificado = EXCLUDED.caminho_certificado,
                     senha_certificado   = EXCLUDED.senha_certificado,
@@ -167,7 +170,8 @@ def salvar_cliente(nome: str, dados: dict):
                     cnpj                = EXCLUDED.cnpj,
                     razao_social        = EXCLUDED.razao_social,
                     inscricao_municipal = EXCLUDED.inscricao_municipal,
-                    codigo_ibge         = EXCLUDED.codigo_ibge
+                    codigo_ibge         = EXCLUDED.codigo_ibge,
+                    tomadores           = EXCLUDED.tomadores
             """, (
                 nome,
                 dados.get("caminho_certificado", ""),
@@ -181,6 +185,7 @@ def salvar_cliente(nome: str, dados: dict):
                 dados.get("razao_social", ""),
                 dados.get("inscricao_municipal", ""),
                 dados.get("codigo_ibge", ""),
+                json.dumps(dados.get("tomadores", [])),
             ))
         conn.commit()
 

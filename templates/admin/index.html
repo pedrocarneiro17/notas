@@ -286,6 +286,32 @@
       </div>
 
       <div class="form-group">
+        <label>Tomadores cadastrados</label>
+        <div class="chips-wrap" id="chips-tomadores"></div>
+        <div class="chip-input-row">
+          <button type="button" class="btn btn-outline btn-sm" onclick="toggleFormTomador()" id="btn-add-tomador">+ Tomador</button>
+        </div>
+        <div id="form-add-tomador" style="display:none;background:#f8f9fa;padding:.75rem;border-radius:8px;margin-top:.5rem;border:1.5px solid var(--border)">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom:.6rem"><label>Nome / Apelido</label><input type="text" id="at-nome" placeholder="Ex: Empresa ABC"></div>
+            <div class="form-group" style="margin-bottom:.6rem"><label>Tipo</label>
+              <select id="at-tipo"><option value="CNPJ">CNPJ</option><option value="CPF">CPF</option></select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:.6rem"><label>CNPJ / CPF</label><input type="text" id="at-inscricao" placeholder="00.000.000/0000-00"></div>
+          <div class="form-row-3">
+            <div class="form-group" style="margin-bottom:.6rem"><label>CEP</label><input type="text" id="at-cep" placeholder="00.000-000"></div>
+            <div class="form-group" style="margin-bottom:.6rem"><label>Número</label><input type="text" id="at-num" placeholder="S/N"></div>
+            <div class="form-group" style="margin-bottom:.6rem"><label>Complemento</label><input type="text" id="at-comp"></div>
+          </div>
+          <div style="display:flex;gap:.5rem;margin-top:.25rem">
+            <button type="button" class="btn btn-primary btn-sm" onclick="confirmarTomador()">Adicionar</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="toggleFormTomador()">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
         <label style="display:flex;align-items:center;gap:.5rem;font-size:.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;cursor:pointer">
           <input type="checkbox" id="cli-obra" style="width:15px;height:15px;margin:0">
           Exige endereço de obra
@@ -554,7 +580,41 @@ function removeChip(tipo, i) { _chips[tipo].splice(i, 1); renderChips(tipo); }
   });
 });
 
-let _chips = { nbs: [], trib: [] };
+let _chips = { nbs: [], trib: [], tomadores: [] };
+
+/* ── Tomadores ── */
+function renderTomadores() {
+  const wrap = document.getElementById('chips-tomadores');
+  wrap.innerHTML = _chips.tomadores.map((t, i) => `
+    <span class="chip">${t.nome || t.inscricao}
+      <button type="button" onclick="removeTomador(${i})">×</button>
+    </span>`).join('');
+}
+function removeTomador(i) { _chips.tomadores.splice(i, 1); renderTomadores(); }
+function toggleFormTomador() {
+  const f = document.getElementById('form-add-tomador');
+  const visible = f.style.display !== 'none';
+  f.style.display = visible ? 'none' : 'block';
+  if (!visible) {
+    ['at-nome','at-inscricao','at-cep','at-num','at-comp'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('at-tipo').value = 'CNPJ';
+    document.getElementById('at-inscricao').focus();
+  }
+}
+function confirmarTomador() {
+  const inscricao = document.getElementById('at-inscricao').value.trim();
+  if (!inscricao) { document.getElementById('at-inscricao').focus(); return; }
+  _chips.tomadores.push({
+    nome:        document.getElementById('at-nome').value.trim() || inscricao,
+    tipo_doc:    document.getElementById('at-tipo').value,
+    inscricao,
+    cep:         document.getElementById('at-cep').value.trim(),
+    numero:      document.getElementById('at-num').value.trim(),
+    complemento: document.getElementById('at-comp').value.trim(),
+  });
+  renderTomadores();
+  toggleFormTomador();
+}
 
 function abrirModalCliente(id) {
   const modal = document.getElementById('modal-cliente');
@@ -571,9 +631,11 @@ function abrirModalCliente(id) {
   document.getElementById('cli-cert-atual').textContent = c && c.caminho_certificado
     ? 'Atual: ' + c.caminho_certificado.split('/').pop().split('\\').pop() : '';
   document.getElementById('cli-cert-file').value = '';
-  _chips.nbs  = c ? [...(c.codigos_nbs  || [])] : [];
-  _chips.trib = c ? [...(c.codigos_tributacao || [])] : [];
-  renderChips('nbs'); renderChips('trib');
+  _chips.nbs      = c ? [...(c.codigos_nbs        || [])] : [];
+  _chips.trib     = c ? [...(c.codigos_tributacao || [])] : [];
+  _chips.tomadores = c ? [...(c.tomadores          || [])] : [];
+  renderChips('nbs'); renderChips('trib'); renderTomadores();
+  document.getElementById('form-add-tomador').style.display = 'none';
   modal.style.pointerEvents = '';
   modal.style.display = 'block';
 }
@@ -595,6 +657,7 @@ async function salvarCliente(e) {
   fd.append('lucro_presumido',    document.getElementById('cli-regime').value);
   fd.append('codigos_nbs',        _chips.nbs.join('\n'));
   fd.append('codigos_tributacao', _chips.trib.join('\n'));
+  fd.append('tomadores',          JSON.stringify(_chips.tomadores));
   fd.append('obra',               document.getElementById('cli-obra').checked ? '1' : '0');
   fd.append('senha_certificado',  document.getElementById('cli-senha').value);
   const certAtual = _clientesCache.find(x => x.id === id);

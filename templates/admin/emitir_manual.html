@@ -46,6 +46,14 @@
       </select>
     </div>
 
+    <!-- SELETOR TOMADOR SALVO -->
+    <div class="form-group" id="wrap-sel-tomador" style="display:none">
+      <label>Tomador salvo</label>
+      <select id="sel_tomador" onchange="preencherTomador()">
+        <option value="">— selecionar tomador —</option>
+      </select>
+    </div>
+
     <!-- TOMADOR -->
     <div class="section-label">Tomador do serviço</div>
 
@@ -164,6 +172,7 @@
 
 <script>
 const _clientes = {{ clientes | tojson }};
+let _tomadoresCliente = [];
 
 async function carregarCodigos() {
   const id = document.getElementById('cliente_id').value;
@@ -175,11 +184,37 @@ async function carregarCodigos() {
 
   const selTrib = document.getElementById('sel_trib');
   const selNbs  = document.getElementById('sel_nbs');
-
   selTrib.innerHTML = (c.codigos_tributacao || []).map(v =>
     `<option value="${v}">${v}</option>`).join('') || '<option value="">—</option>';
   selNbs.innerHTML  = (c.codigos_nbs || []).map(v =>
     `<option value="${v}">${v}</option>`).join('') || '<option value="">—</option>';
+
+  _tomadoresCliente = c.tomadores || [];
+  const wrap   = document.getElementById('wrap-sel-tomador');
+  const selTom = document.getElementById('sel_tomador');
+  if (_tomadoresCliente.length) {
+    selTom.innerHTML = '<option value="">— selecionar tomador —</option>' +
+      _tomadoresCliente.map((t, i) =>
+        `<option value="${i}">${t.nome || t.inscricao}</option>`).join('');
+    wrap.style.display = 'block';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+function preencherTomador() {
+  const i = document.getElementById('sel_tomador').value;
+  if (i === '') return;
+  const t = _tomadoresCliente[parseInt(i)];
+  if (!t) return;
+  document.getElementById('tipo_doc').value          = t.tipo_doc  || 'CNPJ';
+  document.getElementById('inscricao_tomador').value = t.inscricao || '';
+  document.getElementById('cep_tomador').value       = t.cep       || '';
+  document.getElementById('numero_tomador').value    = t.numero    || '';
+  document.querySelector('input[name="complemento_tomador"]').value = t.complemento || '';
+  // garante que o bloco de CEP está visível
+  document.getElementById('sem_cep_tomador').checked = false;
+  document.getElementById('bloco_cep_tomador').style.display = 'block';
 }
 
 /* Máscara CEP */
